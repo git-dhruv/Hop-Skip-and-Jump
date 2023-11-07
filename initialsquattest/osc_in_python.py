@@ -1,3 +1,6 @@
+"""
+@author: Dhruv Parikh, Anirudh Kailaje
+"""
 import pydot
 import numpy as np
 from IPython.display import SVG, display
@@ -6,22 +9,20 @@ from pydrake.all import Simulator, DiagramBuilder, AddMultibodyPlantSceneGraph,\
                         Parser, RigidTransform, MeshcatVisualizer, MeshcatVisualizerParams, \
                         ConstantVectorSource, ConstantValueSource, PiecewisePolynomial,\
                         AbstractValue, HalfSpace, CoulombFriction
-import footstep_planner
+import planner
 import osc
-import importlib
-importlib.reload(osc)
-importlib.reload(footstep_planner)
-from osc import OperationalSpaceWalkingController, OscGains
+from osc import OperationalSpaceWalkingController
 
 from pydrake.all import StartMeshcat
 
+#Start the meshcat server
 meshcat = StartMeshcat()
-
-# Build the block diagram for the simulation
 builder = DiagramBuilder()
 
+#### Designing our world ####
 # Add a planar walker to the simulation
 plant, scene_graph = AddMultibodyPlantSceneGraph(builder, 0.0000005)
+#Half space means a plane -> Ground Plane in particular
 X_WG = HalfSpace.MakePose(np.array([0,0, 1]), np.zeros(3,))
 plant.RegisterCollisionGeometry(
     plant.world_body(), 
@@ -29,6 +30,7 @@ plant.RegisterCollisionGeometry(
     "collision", 
     CoulombFriction(1.0, 1.0)
 )
+#Make the plant
 parser = Parser(plant)
 parser.AddModels("planar_walker.urdf")
 plant.WeldFrames(
@@ -39,62 +41,36 @@ plant.WeldFrames(
 plant.Finalize()
 
 
-# Build the controller diagram
-Kp = np.diag([100, 0, 100])
-Kd = np.diag([10, 0, 10])
-W = np.diag([1, 0, 1])
-
-Wcom = np.zeros((3,3))
-Wcom[2,2] = 1
-
-gains = OscGains(
-        Kp, Kd, Wcom,
-        Kp, Kd, W,
-        np.eye(1), np.eye(1), np.eye(1),
-        0.00001
-    )
+#### Designing the controller ####
+zdes = 0.5 #meters
+osc = builder.AddSystem(OperationalSpaceWalkingController())
+com_planner = builder.AddSystem(planner.COMPlanner())
+z_height_desired = builder.AddSystem(ConstantVectorSource(np.array([zdes])))
+base_traj_src = builder.AddSystem(ConstantValueSource(AbstractValue.Make(PiecewisePolynomial(np.zeros(1,)))))
 
 
-# TODO: Adjust target walking speed here
-walking_speed = 0.3 # walking speed in m/s
+#### Wiring ####
 
-osc = builder.AddSystem(OperationalSpaceWalkingController(gains))
-planner = builder.AddSystem(footstep_planner.LipTrajPlanner())
-speed_src = builder.AddSystem(ConstantVectorSource(np.array([walking_speed])))
-base_traj_src = builder.AddSystem(
-    ConstantValueSource(AbstractValue.Make(PiecewisePolynomial(np.zeros(1,))))
-)
+#COM wiring
+builder.Connect(z_height_desired.get_output_port(), com_planner.get_input_port("zdes"))
+builder.Connect(plant.get_state_output_port(), com_planner.get_input_port("x"))
 
-# Wire planner inputs 
-builder.Connect(plant.get_state_output_port(), 
-                planner.get_state_input_port())
-builder.Connect(speed_src.get_output_port(), 
-                planner.get_walking_speed_input_port())
+# OSC wiring
+builder.Connect(com_planner.get_com_traj_output_port(), osc.get_traj_input_port("com_traj"))
+builder.Connect(plant.get_state_output_port(), osc.get_state_input_port()) 
 
-# Wire OSC inputs
-builder.Connect(plant.get_state_output_port(), 
-                osc.get_state_input_port()) 
-builder.Connect(planner.get_swing_foot_traj_output_port(), 
-                osc.get_traj_input_port("swing_foot_traj"))
-builder.Connect(planner.get_com_traj_output_port(), 
-                osc.get_traj_input_port("com_traj"))
-builder.Connect(base_traj_src.get_output_port(), 
-                osc.get_traj_input_port("base_joint_traj"))
+# Wire OSC to plant
+builder.Connect(osc.get_output_port(), plant.get_actuation_input_port())
 
 # Add the visualizer
 vis_params = MeshcatVisualizerParams(publish_period=0.01)
 MeshcatVisualizer.AddToBuilder(builder, scene_graph, meshcat, params=vis_params)
 
-# Wire OSC to plant
-builder.Connect(osc.get_output_port(), 
-                plant.get_actuation_input_port())
-
 #simulate
 diagram = builder.Build()
-# display(SVG(pydot.graph_from_dot_data(
-#     diagram.GetGraphvizString(max_depth=2))[0].create_svg()))
+display(SVG(pydot.graph_from_dot_data(diagram.GetGraphvizString(max_depth=2))[0].create_svg()))
 
-# NOTE - if you make changes, you should re-run the cell above this one
+################
 
 sim_time = 0.03
 simulator = Simulator(diagram)
