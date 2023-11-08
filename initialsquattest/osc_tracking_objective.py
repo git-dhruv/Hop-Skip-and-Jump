@@ -179,7 +179,7 @@ class JointAngleTrackingObjective(OperationalSpaceTrackingObjective):
         return self.plant.GetVelocities(self.context)[self.joint_vel_idx:self.joint_vel_idx+1].ravel()
 
     def CalcJ(self) -> np.ndarray:
-        J = np.array([0,0,1,0,0,0,0]).reshape(1,-1)  #Dude come on!?? took 1 hour to debug this
+        J = np.array([0,0,1,0,0,0,0]).reshape(1,-1)
         return J
 
     def CalcJdotV(self) -> np.ndarray:
