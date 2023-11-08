@@ -43,9 +43,11 @@ class COMPlanner(LeafSystem):
         return com_pos
     
     def calcDesiredZddot(self, context: Context, output):
+        import numpy as np
         z_des = self.EvalVectorInput(context, self.walking_speed_input_port_index).value()
         z_dd_des = -(z_des - self.calcCOM(context)[-1])
-        output.set_value(BasicVector([0,0,0.3]))
+        output.set_value(BasicVector([0.0,0,float(z_des)]))
+        # print(np.sin(context.get_time()*10))
 
     def CalcYdot(self, state) -> np.ndarray:
         if state is None:

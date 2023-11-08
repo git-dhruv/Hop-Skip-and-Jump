@@ -1,5 +1,9 @@
 """
 @author: Dhruv Parikh, Anirudh Kailaje
+@date: 7th Nov 2023
+@file: bipedSquat.py
+@brief: Biped Does a Squat!
+Mathematically: We track the Center of Mass trajectory on z direction
 """
 import pydot
 import numpy as np
@@ -20,7 +24,7 @@ builder = DiagramBuilder()
 
 #### Designing our world ####
 # Add a planar walker to the simulation
-plant, scene_graph = AddMultibodyPlantSceneGraph(builder, 0.00001)
+plant, scene_graph = AddMultibodyPlantSceneGraph(builder, 0.00005)
 #Half space means a plane -> Ground Plane in particular
 X_WG = HalfSpace.MakePose(np.array([0,0, 1]), np.zeros(3,))
 plant.RegisterCollisionGeometry(
@@ -41,7 +45,7 @@ plant.Finalize()
 
 
 #### Designing the controller ####
-zdes = 0.5 #meters
+zdes = 0.8 #meters
 osc = builder.AddSystem(OperationalSpaceWalkingController())
 com_planner = builder.AddSystem(planner.COMPlanner())
 z_height_desired = builder.AddSystem(ConstantVectorSource(np.array([zdes])))
@@ -63,7 +67,7 @@ builder.Connect(plant.get_state_output_port(), osc.get_state_input_port())
 builder.Connect(osc.get_output_port(), plant.get_actuation_input_port())
 
 # Add the visualizer
-vis_params = MeshcatVisualizerParams(publish_period=0.01)
+vis_params = MeshcatVisualizerParams(publish_period=0.001)
 MeshcatVisualizer.AddToBuilder(builder, scene_graph, meshcat, params=vis_params)
 
 #simulate
@@ -84,7 +88,7 @@ q = np.zeros((plant.num_positions(),))
 q[0] = 0
 q[1] = 0.8*1.2
 theta = -np.arccos(q[1])
-q[3] = theta/2
+q[3] = theta
 q[4] = -2 * theta
 q[5] = theta
 q[6] = -2 * theta

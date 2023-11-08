@@ -56,7 +56,7 @@ class OperationalSpaceWalkingController(LeafSystem):
         self.tracking_objectives = {
             "com_traj": CenterOfMassPositionTrackingObjective(
                 self.plant, self.plant_context, [LEFT_STANCE, RIGHT_STANCE],
-                np.diag([100, 100, 100]), np.diag([100, 100, 100])/10
+                np.diag([100, 0, 100]), np.diag([100, 0, 100])/10
             ),
             "base_joint_traj": JointAngleTrackingObjective(
                 self.plant, self.plant_context, [LEFT_STANCE, RIGHT_STANCE],
@@ -66,6 +66,9 @@ class OperationalSpaceWalkingController(LeafSystem):
 
 
         Wcom = np.eye(3,3)
+        Wcom[1,1] = 0
+        Wcom[2,2] = 4
+        Wcom[0,0] = 4
 
         self.tracking_costs = {
             "com_traj": Wcom,
@@ -147,7 +150,7 @@ class OperationalSpaceWalkingController(LeafSystem):
         # Make decision variables
         u = prog.NewContinuousVariables(self.plant.num_actuators(), "u")
         vdot = prog.NewContinuousVariables(self.plant.num_velocities(), "vdot")
-        lambda_c = prog.NewContinuousVariables(3, "lambda_c")
+        lambda_c = prog.NewContinuousVariables(6, "lambda_c")
 
         # Add Quadratic Cost on Desired Acceleration
         for traj_name in self.trajs:
@@ -168,8 +171,13 @@ class OperationalSpaceWalkingController(LeafSystem):
 
 
         # Calculate terms in the manipulator equation
-        for fsm in [0,1]:
-            J_c, J_c_dot_v = self.CalculateContactJacobian(fsm)
+        # for fsm in [0,1]:
+        if 1:
+            J_c, J_c_dot_v = self.CalculateContactJacobian(0)
+            J_c_2, J_c_dot_v_2 = self.CalculateContactJacobian(1)
+            J_c = np.row_stack((J_c, J_c_2))
+            J_c_dot_v = np.row_stack((J_c_dot_v.reshape(-1,1), J_c_dot_v_2.reshape(-1,1)))
+
             M = self.plant.CalcMassMatrix(self.plant_context)
             Cv = self.plant.CalcBiasTerm(self.plant_context)
         
@@ -183,14 +191,19 @@ class OperationalSpaceWalkingController(LeafSystem):
             prog.AddLinearEqualityConstraint(M@vdot + Cv + G - B@u - J_c.T@lambda_c, np.zeros((7,)))
 
             # TODO: Add Contact Constraint
-            prog.AddLinearEqualityConstraint(J_c_dot_v + J_c@vdot, np.zeros((3,1)))
+            prog.AddLinearEqualityConstraint(J_c_dot_v + (J_c@vdot).reshape(-1,1), np.zeros((6,1)))
 
-        # TODO: Add Friction Cone Constraint assuming mu = 1
-        mu = 1
-        A_fric = np.array([[1,0,-mu],
-                        [-1,0,-mu]])
-        prog.AddLinearConstraint(A_fric@lambda_c.reshape(3,1), -1e10*np.ones((2,1)), np.zeros((2,1))) #Seems fine
-        prog.AddLinearEqualityConstraint(lambda_c[1] == 0)
+            # TODO: Add Friction Cone Constraint assuming mu = 1
+            mu = 1
+            A_fric = np.array([[1, 0, -mu, 0, 0, 0],    # Friction constraint for left foot, positive x-direction
+                            [-1, 0, -mu, 0, 0, 0],   # Friction constraint for left foot, negative x-direction
+                            [0, 0, 0, 1, 0, -mu],    # Friction constraint for right foot, positive x-direction
+                            [0, 0, 0, -1, 0, -mu]])  # Friction constraint for right foot, negative x-direction
+
+            # The constraint is applied to the 6x1 lambda_c vector
+            prog.AddLinearConstraint(A_fric @ lambda_c.reshape(6, 1), -np.inf * np.ones((4, 1)), np.zeros((4, 1)))
+            prog.AddLinearEqualityConstraint(lambda_c[1] == 0)
+            prog.AddLinearEqualityConstraint(lambda_c[4] == 0)
 
 
         # Solve the QP
@@ -201,14 +214,15 @@ class OperationalSpaceWalkingController(LeafSystem):
 
         # If we exceed iteration limits use the previous solution
         if not result.is_success():
+            print("Solver not working")
             usol = self.u
         else:
             usol = result.GetSolution(u)
             self.u = usol
+        # print(usol)
 
         return usol, prog
 
     def CalcTorques(self, context: Context, output: BasicVector) -> None:
         usol, _ = self.SetupAndSolveQP(context)
         output.SetFromVector(usol)
-
