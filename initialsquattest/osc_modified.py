@@ -11,7 +11,8 @@ from pydrake.math import RigidTransform
 
 from osc_tracking_objective import *
 
-from fsm_utils import LEFT_STANCE, RIGHT_STANCE
+LEFT_STANCE = 0
+RIGHT_STANCE = 1
 
 
 class OperationalSpaceWalkingController(LeafSystem):
@@ -59,7 +60,7 @@ class OperationalSpaceWalkingController(LeafSystem):
             ),
             "base_joint_traj": JointAngleTrackingObjective(
                 self.plant, self.plant_context, [LEFT_STANCE, RIGHT_STANCE],
-                np.eye(1), np.eye(1), "planar_roty"
+                10*np.eye(1), np.eye(1), "planar_roty"
             )
         }
 
@@ -163,7 +164,7 @@ class OperationalSpaceWalkingController(LeafSystem):
             
 
         # TODO: Add Quadratic Cost on vdot using self.gains.w_vdot
-        prog.AddQuadraticCost(1e-5*vdot.T@vdot)
+        # prog.AddQuadraticCost(1e-1*vdot.T@vdot)
 
 
         # Calculate terms in the manipulator equation

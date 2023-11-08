@@ -10,7 +10,6 @@ from pydrake.all import Simulator, DiagramBuilder, AddMultibodyPlantSceneGraph,\
                         ConstantVectorSource, ConstantValueSource, PiecewisePolynomial,\
                         AbstractValue, HalfSpace, CoulombFriction
 import planner
-import osc_modified
 from osc_modified import OperationalSpaceWalkingController
 
 from pydrake.all import StartMeshcat, BasicVector
