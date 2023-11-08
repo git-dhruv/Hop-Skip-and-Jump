@@ -10,14 +10,14 @@ from pydrake.multibody.all import JacobianWrtVariable
 import numpy as np
 from scipy.linalg import expm
 
-class COMplaanner(LeafSystem):
+class COMPlanner(LeafSystem):
     def __init__(self):
         LeafSystem.__init__(self)
 
         #Make internal dynamics model to get the COM and stuff#
         self.plant = MultibodyPlant(0.0)
         self.parser = Parser(self.plant)
-        self.parser.AddModels("planar_walker.urdf")
+        self.parser.AddModels("/home/dhruv/final/initialsquattest/planar_walker.urdf")
         self.plant.WeldFrames(
             self.plant.world_frame(),
             self.plant.GetBodyByName("base").body_frame(),
@@ -34,17 +34,18 @@ class COMplaanner(LeafSystem):
         #Output Port
         self.com_traj_output_port_index = self.DeclareAbstractOutputPort("com_traj", lambda: AbstractValue.Make(BasicVector(3)),self.calcDesiredZddot).get_index()
 
-    def calcCOM(self, state = None):
-        if state is None:
-            state = self.EvalVectorInput(self.plant_context, self.robot_state_input_port_index).value()
+    def calcCOM(self, context):
+        # if state is None:
+        #     state = self.EvalVectorInput(self.plant_context, self.robot_state_input_port_index).value()
+        state = self.EvalVectorInput(context, self.robot_state_input_port_index).value()
         self.plant.SetPositionsAndVelocities(self.plant_context, state)
         com_pos = self.plant.CalcCenterOfMassPositionInWorld(self.plant_context).ravel()
         return com_pos
     
     def calcDesiredZddot(self, context: Context, output):
-        z_des = self.get_input_port(self.walking_speed_input_port_index)
-        z_dd_des = (z_des - self.calcCOM())
-        output.set_value(BasicVector([0,0,z_dd_des]))
+        z_des = self.EvalVectorInput(context, self.walking_speed_input_port_index).value()
+        z_dd_des = -(z_des - self.calcCOM(context)[-1])
+        output.set_value(BasicVector([0,0,0.3]))
 
     def CalcYdot(self, state) -> np.ndarray:
         if state is None:
@@ -57,4 +58,7 @@ class COMplaanner(LeafSystem):
             self.context, JacobianWrtVariable.kV, self.plant.world_frame(), self.plant.world_frame())
     def get_com_traj_output_port(self):
         return self.get_output_port(self.com_traj_output_port_index)
-    
+    def get_com_zdes_input_port(self):
+        return self.get_input_port(self.walking_speed_input_port_index)
+    def get_com_state_input_port(self):
+        return self.get_input_port(self.robot_state_input_port_index)

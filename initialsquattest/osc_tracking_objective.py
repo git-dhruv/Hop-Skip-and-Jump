@@ -56,11 +56,13 @@ class OperationalSpaceTrackingObjective(ABC):
         self.J = self.CalcJ()
         self.JdotV = self.CalcJdotV()
 
-        yd = y_des_traj.value(t).ravel()
-        yd_dot = y_des_traj.derivative(1).value(t).ravel()
-        yd_ddot = y_des_traj.derivative(2).value(t).ravel()
+        yd = y_des_traj.value().ravel()
+        # yd_dot = y_des_traj.derivative(1).value(t).ravel()
+        # yd_ddot = y_des_traj.derivative(2).value(t).ravel()
 
-        self.yddot_cmd = yd_ddot - self.kp @ (y - yd) - self.kd @ (ydot - yd_dot)
+        # self.yddot_cmd = yd_ddot - self.kp @ (y - yd) - self.kd @ (ydot - yd_dot)
+        self.yddot_cmd = -self.kp @ (y - yd)
+        # print((y - yd))
 
     def GetJ(self):
         return self.J
