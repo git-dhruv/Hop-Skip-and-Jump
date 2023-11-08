@@ -3,7 +3,7 @@
 @date: 7th Nov 2023
 @file: bipedSquat.py
 @brief: Biped Does a Squat!
-Mathematically: We track the Center of Mass trajectory on z direction
+Mathematically: We track the Center of Mass trajectory on z direction with constraints of both foot on ground
 """
 import pydot
 import numpy as np
@@ -30,9 +30,8 @@ X_WG = HalfSpace.MakePose(np.array([0,0, 1]), np.zeros(3,))
 plant.RegisterCollisionGeometry(
     plant.world_body(), 
     X_WG, HalfSpace(), 
-    "collision", 
-    CoulombFriction(1.0, 1.0)
-)
+    "collision", CoulombFriction(1.0, 1.0))
+
 #Make the plant
 parser = Parser(plant)
 parser.AddModels("/home/dhruv/final/initialsquattest/planar_walker.urdf")
@@ -45,7 +44,7 @@ plant.Finalize()
 
 
 #### Designing the controller ####
-zdes = 0.8 #meters
+zdes = 0.8 #desired Z height in meters
 osc = builder.AddSystem(OperationalSpaceWalkingController())
 com_planner = builder.AddSystem(planner.COMPlanner())
 z_height_desired = builder.AddSystem(ConstantVectorSource(np.array([zdes])))
@@ -62,12 +61,10 @@ builder.Connect(plant.get_state_output_port(), com_planner.get_com_state_input_p
 builder.Connect(com_planner.get_com_traj_output_port(), osc.get_traj_input_port("com_traj"))
 builder.Connect(base_traj_src.get_output_port(), osc.get_traj_input_port("base_joint_traj"))
 builder.Connect(plant.get_state_output_port(), osc.get_state_input_port()) 
-
-# Wire OSC to plant
 builder.Connect(osc.get_output_port(), plant.get_actuation_input_port())
 
 # Add the visualizer
-vis_params = MeshcatVisualizerParams(publish_period=0.001)
+vis_params = MeshcatVisualizerParams(publish_period=0.0005)
 MeshcatVisualizer.AddToBuilder(builder, scene_graph, meshcat, params=vis_params)
 
 #simulate
@@ -76,22 +73,22 @@ display(SVG(pydot.graph_from_dot_data(diagram.GetGraphvizString(max_depth=2))[0]
 
 ################
 
-sim_time = 2.03
+sim_time = 5
 simulator = Simulator(diagram)
 simulator.Initialize()
-simulator.set_target_realtime_rate(1)
+simulator.set_target_realtime_rate(0.1)
 
-# Set the robot state
+# Initial State
 plant_context = diagram.GetMutableSubsystemContext(
     plant, simulator.get_mutable_context())
 q = np.zeros((plant.num_positions(),))
 q[0] = 0
 q[1] = 0.8*1.2
 theta = -np.arccos(q[1])
-q[3] = theta
+q[3] = theta/2
 q[4] = -2 * theta
 q[5] = theta
-q[6] = -2 * theta
+q[6] = -2 * theta/2
 plant.SetPositions(plant_context, q)
 
 # Simulate the robot

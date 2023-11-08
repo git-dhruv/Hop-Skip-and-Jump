@@ -1,3 +1,7 @@
+"""
+Lower level instantaneous QP
+Tracks Desired COM with both feet on ground
+"""
 import numpy as np
 from typing import List, Tuple
 
@@ -56,7 +60,7 @@ class OperationalSpaceWalkingController(LeafSystem):
         self.tracking_objectives = {
             "com_traj": CenterOfMassPositionTrackingObjective(
                 self.plant, self.plant_context, [LEFT_STANCE, RIGHT_STANCE],
-                np.diag([100, 0, 100]), np.diag([100, 0, 100])/10
+                np.diag([500, 0, 500]), np.diag([100, 0, 100])/10
             ),
             "base_joint_traj": JointAngleTrackingObjective(
                 self.plant, self.plant_context, [LEFT_STANCE, RIGHT_STANCE],
@@ -64,7 +68,7 @@ class OperationalSpaceWalkingController(LeafSystem):
             )
         }
 
-
+        ### @ask ta about this non convexity ###
         Wcom = np.eye(3,3)
         Wcom[1,1] = 0
         Wcom[2,2] = 4
@@ -140,7 +144,6 @@ class OperationalSpaceWalkingController(LeafSystem):
 
         # Update tracking objectives
         for traj_name in self.trajs:
-            # print(traj_name)
             traj = self.EvalAbstractInput(context, self.traj_input_ports[traj_name]).get_value()
             self.tracking_objectives[traj_name].Update(t, traj, fsm)
 
@@ -170,40 +173,40 @@ class OperationalSpaceWalkingController(LeafSystem):
         # prog.AddQuadraticCost(1e-1*vdot.T@vdot)
 
 
-        # Calculate terms in the manipulator equation
-        # for fsm in [0,1]:
-        if 1:
-            J_c, J_c_dot_v = self.CalculateContactJacobian(0)
-            J_c_2, J_c_dot_v_2 = self.CalculateContactJacobian(1)
-            J_c = np.row_stack((J_c, J_c_2))
-            J_c_dot_v = np.row_stack((J_c_dot_v.reshape(-1,1), J_c_dot_v_2.reshape(-1,1)))
-
-            M = self.plant.CalcMassMatrix(self.plant_context)
-            Cv = self.plant.CalcBiasTerm(self.plant_context)
         
-            # Drake considers gravity to be an external force (on the right side of the dynamics equations), 
-            # so we negate it to match the homework PDF and slides
-            G = -self.plant.CalcGravityGeneralizedForces(self.plant_context)
-            B = self.plant.MakeActuationMatrix()
+        #I concatenate both contact Jacobians and then lamba c is modified to make 6,1
+        J_c, J_c_dot_v = self.CalculateContactJacobian(0)
+        J_c_2, J_c_dot_v_2 = self.CalculateContactJacobian(1)
+        J_c = np.row_stack((J_c, J_c_2))
+        J_c_dot_v = np.row_stack((J_c_dot_v.reshape(-1,1), J_c_dot_v_2.reshape(-1,1)))
+        
+        # Calculate terms in the manipulator equation
+        M = self.plant.CalcMassMatrix(self.plant_context)
+        Cv = self.plant.CalcBiasTerm(self.plant_context)
+    
+        # Drake considers gravity to be an external force (on the right side of the dynamics equations), 
+        # so we negate it to match the homework PDF and slides
+        G = -self.plant.CalcGravityGeneralizedForces(self.plant_context)
+        B = self.plant.MakeActuationMatrix()
 
-            # TODO: Add the dynamics constraint
-            #Forcing reshape because Gradescope is angry
-            prog.AddLinearEqualityConstraint(M@vdot + Cv + G - B@u - J_c.T@lambda_c, np.zeros((7,)))
 
-            # TODO: Add Contact Constraint
-            prog.AddLinearEqualityConstraint(J_c_dot_v + (J_c@vdot).reshape(-1,1), np.zeros((6,1)))
+        #Dynamics
+        prog.AddLinearEqualityConstraint(M@vdot + Cv + G - B@u - J_c.T@lambda_c, np.zeros((7,)))
 
-            # TODO: Add Friction Cone Constraint assuming mu = 1
-            mu = 1
-            A_fric = np.array([[1, 0, -mu, 0, 0, 0],    # Friction constraint for left foot, positive x-direction
-                            [-1, 0, -mu, 0, 0, 0],   # Friction constraint for left foot, negative x-direction
-                            [0, 0, 0, 1, 0, -mu],    # Friction constraint for right foot, positive x-direction
-                            [0, 0, 0, -1, 0, -mu]])  # Friction constraint for right foot, negative x-direction
+        #Contact
+        prog.AddLinearEqualityConstraint(J_c_dot_v + (J_c@vdot).reshape(-1,1), np.zeros((6,1)))
 
-            # The constraint is applied to the 6x1 lambda_c vector
-            prog.AddLinearConstraint(A_fric @ lambda_c.reshape(6, 1), -np.inf * np.ones((4, 1)), np.zeros((4, 1)))
-            prog.AddLinearEqualityConstraint(lambda_c[1] == 0)
-            prog.AddLinearEqualityConstraint(lambda_c[4] == 0)
+        # Friction Cone Constraint
+        mu = 1
+        A_fric = np.array([[1, 0, -mu, 0, 0, 0],    # Friction constraint for left foot, positive x-direction
+                        [-1, 0, -mu, 0, 0, 0],   # Friction constraint for left foot, negative x-direction
+                        [0, 0, 0, 1, 0, -mu],    # Friction constraint for right foot, positive x-direction
+                        [0, 0, 0, -1, 0, -mu]])  # Friction constraint for right foot, negative x-direction
+
+        # The constraint is applied to the 6x1 lambda_c vector
+        prog.AddLinearConstraint(A_fric @ lambda_c.reshape(6, 1), -np.inf * np.ones((4, 1)), np.zeros((4, 1)))
+        prog.AddLinearEqualityConstraint(lambda_c[1] == 0)
+        prog.AddLinearEqualityConstraint(lambda_c[4] == 0)
 
 
         # Solve the QP
@@ -214,12 +217,11 @@ class OperationalSpaceWalkingController(LeafSystem):
 
         # If we exceed iteration limits use the previous solution
         if not result.is_success():
-            print("Solver not working")
+            print("Solver not working, pal!!!")
             usol = self.u
         else:
             usol = result.GetSolution(u)
             self.u = usol
-        # print(usol)
 
         return usol, prog
 
