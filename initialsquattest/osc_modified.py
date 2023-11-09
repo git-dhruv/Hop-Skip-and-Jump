@@ -13,6 +13,8 @@ from pydrake.solvers import MathematicalProgram, OsqpSolver
 from pydrake.common.value import AbstractValue
 from pydrake.math import RigidTransform
 
+
+from pydrake.multibody.all import JacobianWrtVariable
 from osc_tracking_objective import *
 
 LEFT_STANCE = 0
@@ -94,11 +96,36 @@ class OperationalSpaceWalkingController(LeafSystem):
             "base_joint_traj": self.DeclareAbstractInputPort("base_joint_traj", AbstractValue.Make(BasicVector(1))).get_index()}
 
         # Define the output ports
-        self.torque_output_port = self.DeclareVectorOutputPort(
-            "u", self.plant.num_actuators(), self.CalcTorques
-        )
+        self.torque_output_port = self.DeclareVectorOutputPort("u", self.plant.num_actuators(), self.CalcTorques)
+
+        ## Log callback ##
+        self.logging_port = self.DeclareVectorOutputPort("metrics", BasicVector(6), self.logCB)
 
         self.u = np.zeros((self.plant.num_actuators()))
+
+    def logCB(self, context, output):
+        ### For now we are tracking the COM Z, Zdot and Zddot ###
+        #Get the current state from the input port
+        state = self.EvalVectorInput(context, self.robot_state_input_port_index).value()
+        #Simulate our robot to the current state
+        self.plant.SetPositionsAndVelocities(self.plant_context, state)
+        #Extract the Center of Mass of our robot
+        com_pos = self.plant.CalcCenterOfMassPositionInWorld(self.plant_context).ravel()
+
+        J = self.plant.CalcJacobianCenterOfMassTranslationalVelocity(self.plant_context,
+                                                                     JacobianWrtVariable.kV,
+                                                                     self.plant.world_frame(),
+                                                                     self.plant.world_frame())
+        Jdv = self.plant.CalcBiasCenterOfMassTranslationalAcceleration(self.plant_context,
+                                                                     JacobianWrtVariable.kV,
+                                                                     self.plant.world_frame(),
+                                                                     self.plant.world_frame())
+        
+        com_vel = (J @ self.plant.GetVelocities(self.plant_context)).ravel()
+        # com_acc = (J @ self.plant.GetVelocities(self.context)).ravel() How tf to calculate this
+
+        
+        output.SetFromVector(np.concatenate((com_pos, com_vel)))
 
     def get_traj_input_port(self, traj_name):
         return self.get_input_port(self.traj_input_ports[traj_name])
@@ -198,7 +225,7 @@ class OperationalSpaceWalkingController(LeafSystem):
 
         # Friction Cone Constraint
         mu = 1
-        A_fric = np.array([[1, 0, -mu, 0, 0, 0],    # Friction constraint for left foot, positive x-direction
+        A_fric = np.array([[1, 0, -mu, 0, 0, 0], # Friction constraint for left foot, positive x-direction
                         [-1, 0, -mu, 0, 0, 0],   # Friction constraint for left foot, negative x-direction
                         [0, 0, 0, 1, 0, -mu],    # Friction constraint for right foot, positive x-direction
                         [0, 0, 0, -1, 0, -mu]])  # Friction constraint for right foot, negative x-direction

@@ -16,7 +16,8 @@ from pydrake.all import Simulator, DiagramBuilder, AddMultibodyPlantSceneGraph,\
 import planner
 from osc_modified import OperationalSpaceWalkingController
 
-from pydrake.all import StartMeshcat, BasicVector
+from pydrake.all import StartMeshcat, BasicVector, LogVectorOutput
+import matplotlib.pyplot as plt
 
 #Start the meshcat server
 meshcat = StartMeshcat()
@@ -51,6 +52,10 @@ z_height_desired = builder.AddSystem(ConstantVectorSource(np.array([zdes])))
 base_traj_src = builder.AddSystem(ConstantValueSource(AbstractValue.Make(BasicVector(np.zeros(1,)))))
 
 
+## Logger ##
+logger = LogVectorOutput(osc.GetOutputPort("metrics"),builder)
+
+
 #### Wiring ####
 
 #COM wiring
@@ -61,7 +66,7 @@ builder.Connect(plant.get_state_output_port(), com_planner.get_com_state_input_p
 builder.Connect(com_planner.get_com_traj_output_port(), osc.get_traj_input_port("com_traj"))
 builder.Connect(base_traj_src.get_output_port(), osc.get_traj_input_port("base_joint_traj"))
 builder.Connect(plant.get_state_output_port(), osc.get_state_input_port()) 
-builder.Connect(osc.get_output_port(), plant.get_actuation_input_port())
+builder.Connect(osc.torque_output_port, plant.get_actuation_input_port())
 
 # Add the visualizer
 vis_params = MeshcatVisualizerParams(publish_period=0.0005)
@@ -73,7 +78,7 @@ display(SVG(pydot.graph_from_dot_data(diagram.GetGraphvizString(max_depth=2))[0]
 
 ################
 
-sim_time = 5
+sim_time = 1
 simulator = Simulator(diagram)
 simulator.Initialize()
 simulator.set_target_realtime_rate(0.1)
@@ -93,3 +98,16 @@ plant.SetPositions(plant_context, q)
 
 # Simulate the robot
 simulator.AdvanceTo(sim_time)
+
+## Logs and Plots ##
+log = logger.FindLog(simulator.get_mutable_context()) #xyz vxvyvz
+t = log.sample_times()
+x = log.data()[2]   
+xdot = log.data()[-1]
+
+plt.figure()
+plt.plot(t, x)
+plt.figure()
+plt.plot(t, xdot)
+plt.show()
+
