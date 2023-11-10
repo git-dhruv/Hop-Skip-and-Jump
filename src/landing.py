@@ -33,6 +33,12 @@ import logging
 class landing(LeafSystem):
     """
     Landing Phase, Clap for me Bitches
+
+    @output ports: 1 ;size = 4; Data = [com_x, com_y, com_z, torso angle]
+    @input ports: 3;
+        x: State Input
+        com_des: Center of Mass (size = 3) - read as desired height
+        torso_des: Final Torso Angle (size = 1) - in radians!
     """
     
     def __init__(self):

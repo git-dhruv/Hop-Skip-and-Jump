@@ -33,6 +33,11 @@ import logging
 class flight(LeafSystem):
     """
     Flight Phase, with feedback huh
+
+    @output ports: 1 ;size = 3; Data = [Idk]
+    @input ports: 2;
+        x: State Input
+        footclearance: Foot Clearance (size = 3) - read as desired height
     """
     
     def __init__(self):
@@ -52,7 +57,7 @@ class flight(LeafSystem):
 
         # Input Ports #
         self.robot_state_input_port_index = self.DeclareVectorInputPort("x", self.plant.num_positions() + self.plant.num_velocities()).get_index()
-        self.com_des_input_port_index = self.DeclareVectorInputPort("footclearance", 3).get_index()
+        self.ft_clearance_port_index = self.DeclareVectorInputPort("footclearance", 3).get_index()
 
         # Output Ports # foot 
         self.com_trajectory_output_port_index = self.DeclareVectorInputPort("traj", lambda: AbstractValue.Make(BasicVector(3)),self.allTrajCB).get_index()
@@ -63,7 +68,7 @@ class flight(LeafSystem):
     ## Port Accessors ##
     def get_state_input_port(self):
         return self.robot_state_input_port
-    def get_com_input_port(self):
-        return self.com_des_input_port_index
+    def get_ftclearance_input_port(self):
+        return self.ft_clearance_port_index
     def get_com_output_port(self):
         return self.com_trajectory_output_port_index
