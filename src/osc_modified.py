@@ -36,7 +36,7 @@ class OperationalSpaceWalkingController(LeafSystem):
         ### Internal Plant Model for simulation ###
         self.plant = MultibodyPlant(0.0)
         self.parser = Parser(self.plant)
-        self.parser.AddModels("models/planar_walker.urdf")
+        self.parser.AddModels("../models/planar_walker.urdf")
         self.plant.WeldFrames(
             self.plant.world_frame(),
             self.plant.GetBodyByName("base").body_frame(),
