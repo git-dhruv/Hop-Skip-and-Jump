@@ -2,11 +2,27 @@
 # -*- coding: utf-8 -*-
 
 """
-flight.py: Flight Phase
+@author: Dhruv Parikh, Anirudh Kailaje
+@date: 
+@file: 
+@brief: 
 """
 
+#####  Pydrake Files  #####
+from pydrake.multibody.plant import MultibodyPlant
+from pydrake.multibody.parsing import Parser
+from pydrake.systems.framework import Context, LeafSystem, BasicVector, DiscreteValues, EventStatus
+from pydrake.trajectories import Trajectory, PiecewisePolynomial
+from pydrake.common.value import AbstractValue
+from pydrake.math import RigidTransform
+from pydrake.multibody.all import JacobianWrtVariable
+
+
+import numpy as np
 import sys
 import logging
+
+
 
 # Module constants
 # CONSTANT_1 = "value"
@@ -14,23 +30,43 @@ import logging
 # Module "global" variables
 # global_var = None
 
-class MyClass:
+class landing(LeafSystem):
     """
-    A simple example class with standard methods and documentation.
+    Landing Phase, Clap for me Bitches
     """
     
-    def __init__(self, attribute1, attribute2):
-        """
-        Initialize the MyClass instance with attribute1 and attribute2.
-        """
-        self.attribute1 = attribute1
-        self.attribute2 = attribute2
+    def __init__(self):
+        LeafSystem.__init__(self)
 
+        # Make internal dynamics model to get the COM and stuff #
+        self.plant = MultibodyPlant(0.0)
+        self.parser = Parser(self.plant)
+        self.parser.AddModels("planner_walker.urdf")
+        self.plant.WeldFrames(
+            self.plant.world_frame(),
+            self.plant.GetBodyByName("base").body_frame(),
+            RigidTransform.Identity()
+        )
+        self.plant.Finalize()
+        self.plant_context = self.plant.CreateDefaultContext()
 
-def main()->None:    
-    my_object = MyClass("value1", "value2")
+        # Input Ports #
+        self.robot_state_input_port_index = self.DeclareVectorInputPort("x", self.plant.num_positions() + self.plant.num_velocities()).get_index()
+        self.com_des_input_port_index = self.DeclareVectorInputPort("com_des", 3).get_index()
+        self.torso_des_input_port_index = self.DeclareVectorInputPort("torso_des", 1).get_index()
 
-if __name__ == "__main__":
-    # Configure logging
-    logging.basicConfig(level=logging.INFO)
-    main()
+        # Output Ports #
+        self.com_trajectory_output_port_index = self.DeclareVectorInputPort("comtraj", lambda: AbstractValue.Make(BasicVector(4)),self.comtrajCB).get_index()
+
+    def comtrajCB(self):
+        pass
+    
+    ## Port Accessors ##
+    def get_state_input_port(self):
+        return self.robot_state_input_port
+    def get_com_input_port(self):
+        return self.com_des_input_port_index
+    def get_torso_input_port(self):
+        return self.torso_des_input_port_index
+    def get_com_output_port(self):
+        return self.com_trajectory_output_port_index
