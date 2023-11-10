@@ -3,9 +3,9 @@
 
 """
 @author: Dhruv Parikh, Anirudh Kailaje
-@date: 
-@file: 
-@brief: 
+@date: 10th Nov 2023
+@file: flight.py
+@brief: Flight Phase Swing Foot trajectory is handled from this planner. 
 """
 
 #####  Pydrake Files  #####

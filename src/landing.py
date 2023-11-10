@@ -3,9 +3,9 @@
 
 """
 @author: Dhruv Parikh, Anirudh Kailaje
-@date: 
-@file: 
-@brief: 
+@date: 10th Nov 2023
+@file: landing.py
+@brief: Landing Phase Squatter 
 """
 
 #####  Pydrake Files  #####
