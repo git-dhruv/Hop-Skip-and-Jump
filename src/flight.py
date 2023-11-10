@@ -46,7 +46,7 @@ class flight(LeafSystem):
         # Make internal dynamics model to get the COM and stuff #
         self.plant = MultibodyPlant(0.0)
         self.parser = Parser(self.plant)
-        self.parser.AddModels("planner_walker.urdf")
+        self.parser.AddModels("models/planar_walker.urdf")
         self.plant.WeldFrames(
             self.plant.world_frame(),
             self.plant.GetBodyByName("base").body_frame(),
@@ -57,18 +57,18 @@ class flight(LeafSystem):
 
         # Input Ports #
         self.robot_state_input_port_index = self.DeclareVectorInputPort("x", self.plant.num_positions() + self.plant.num_velocities()).get_index()
-        self.ft_clearance_port_index = self.DeclareVectorInputPort("footclearance", 3).get_index()
+        self.ft_clearance_port_index = self.DeclareVectorInputPort("footclearance", 1).get_index()
 
         # Output Ports # foot 
-        self.com_trajectory_output_port_index = self.DeclareVectorInputPort("traj", lambda: AbstractValue.Make(BasicVector(3)),self.allTrajCB).get_index()
+        self.com_trajectory_output_port_index = self.DeclareAbstractOutputPort("traj", lambda: AbstractValue.Make(BasicVector(3)),self.allTrajCB).get_index()
 
     def allTrajCB(self):
         pass
     
     ## Port Accessors ##
     def get_state_input_port(self):
-        return self.robot_state_input_port
+        return self.get_input_port(self.robot_state_input_port_index)
     def get_ftclearance_input_port(self):
-        return self.ft_clearance_port_index
+        return self.get_input_port(self.ft_clearance_port_index)
     def get_com_output_port(self):
-        return self.com_trajectory_output_port_index
+        return self.get_output_port(self.com_trajectory_output_port_index)

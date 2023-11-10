@@ -36,7 +36,7 @@ plant.RegisterCollisionGeometry(
 
 #Make the plant
 parser = Parser(plant)
-parser.AddModels("/home/dhruv/final/initialsquattest/planar_walker.urdf")
+parser.AddModels("models/planar_walker.urdf")
 plant.WeldFrames(
     plant.world_frame(),
     plant.GetBodyByName("base").body_frame(),
@@ -76,9 +76,9 @@ vis_params = MeshcatVisualizerParams(publish_period=0.0005)
 MeshcatVisualizer.AddToBuilder(builder, scene_graph, meshcat, params=vis_params)
 #simulate
 diagram = builder.Build()
-graph = (pydot.graph_from_dot_data(diagram.GetGraphvizString(max_depth=2))[0].create_svg()))
-with f as open("graph.svg", "w"):
-    f.write(graph)
+graph = (pydot.graph_from_dot_data(diagram.GetGraphvizString(max_depth=2))[0].create_svg())
+# with f as open("graph.svg", "w"):
+#     f.write(graph)
 ################
 
 sim_time = 1
