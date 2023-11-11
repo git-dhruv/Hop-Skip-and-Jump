@@ -62,7 +62,7 @@ class OperationalSpaceWalkingController(LeafSystem):
         self.tracking_objectives = {
             "com_traj": CenterOfMassPositionTrackingObjective(
                 self.plant, self.plant_context, [LEFT_STANCE, RIGHT_STANCE],
-                np.diag([500, 0, 500]), np.diag([100, 0, 100])/10
+                np.diag([500, 0, 500]), np.diag([100, 0, 100])/20
             ),
             "base_joint_traj": JointAngleTrackingObjective(
                 self.plant, self.plant_context, [LEFT_STANCE, RIGHT_STANCE],
@@ -99,7 +99,7 @@ class OperationalSpaceWalkingController(LeafSystem):
         self.torque_output_port = self.DeclareVectorOutputPort("u", self.plant.num_actuators(), self.CalcTorques)
 
         ## Log callback ##
-        self.logging_port = self.DeclareVectorOutputPort("metrics", BasicVector(6), self.logCB)
+        self.logging_port = self.DeclareVectorOutputPort("metrics", BasicVector(14), self.logCB)
 
         self.u = np.zeros((self.plant.num_actuators()))
 
@@ -125,7 +125,8 @@ class OperationalSpaceWalkingController(LeafSystem):
         # com_acc = (J @ self.plant.GetVelocities(self.context)).ravel() How tf to calculate this
 
         
-        output.SetFromVector(np.concatenate((com_pos, com_vel)))
+        # output.SetFromVector(np.concatenate((com_pos, com_vel)))
+        output.SetFromVector(state)
 
     def get_traj_input_port(self, traj_name):
         return self.get_input_port(self.traj_input_ports[traj_name])

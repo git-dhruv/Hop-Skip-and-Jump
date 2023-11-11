@@ -26,7 +26,7 @@ builder = DiagramBuilder()
 
 #### Designing our world ####
 # Add a planar walker to the simulation
-plant, scene_graph = AddMultibodyPlantSceneGraph(builder, 0.00005)
+plant, scene_graph = AddMultibodyPlantSceneGraph(builder, 0.0005)
 #Half space means a plane -> Ground Plane in particular
 X_WG = HalfSpace.MakePose(np.array([0,0, 1]), np.zeros(3,))
 plant.RegisterCollisionGeometry(
@@ -101,6 +101,8 @@ simulator.AdvanceTo(sim_time)
 ## Logs and Plots ##
 log = logger.FindLog(simulator.get_mutable_context()) #xyz vxvyvz
 t = log.sample_times()
+np.save('traj.npy', log.data())
+print(log.data())
 x = log.data()[2]   
 xdot = log.data()[-1]
 
@@ -108,6 +110,6 @@ plt.figure()
 plt.plot(t, x)
 plt.figure()
 plt.plot(t, xdot)
-plt.savefig(f"./logs/{time}plots.png")
-plt.show()
+# plt.savefig(f"./logs/{time}plots.png")
+# plt.show()
 
