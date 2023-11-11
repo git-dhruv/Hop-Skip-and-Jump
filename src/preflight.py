@@ -10,17 +10,18 @@
 
 #####  Pydrake Files  #####
 from pydrake.multibody.plant import MultibodyPlant
+from typing import List, Dict
 from pydrake.multibody.parsing import Parser
 from pydrake.systems.framework import Context, LeafSystem, BasicVector, DiscreteValues, EventStatus
 from pydrake.trajectories import Trajectory, PiecewisePolynomial
 from pydrake.common.value import AbstractValue
 from pydrake.math import RigidTransform
 from pydrake.multibody.all import JacobianWrtVariable
-
-
+from pydrake.all import MathematicalProgram, JointActuatorIndex
 import numpy as np
 import sys
 import logging
+from scipy.constants import g
 
 
 
@@ -61,12 +62,28 @@ class dircol(LeafSystem):
         self.com_des_input_port_index = self.DeclareVectorInputPort("com_des", BasicVector(1)).get_index()
         self.time_des_input_port_index = self.DeclareVectorInputPort("time_des", BasicVector(1)).get_index()
 
-
         # Output Ports #
         self.com_trajectory_output_port_index = self.DeclareAbstractOutputPort("comtraj", lambda: AbstractValue.Make(BasicVector(self.plant.num_positions()+self.plant.num_velocities())),self.comtrajCB).get_index()
 
-    def comtrajCB(self):
+    def comtrajCB(self, context: Context, output: BasicVector) -> None:
         # I just made the ugliest name to give to a function
+        x = self.EvalVectorInput(context, self.robot_state_input_port_index).get_value()
+        t = context.get_time()
+        if t < 0.0005:
+            prog = MathematicalProgram(); num_knot_points = 5
+            robot = self.plant.ToAutoDiffXd()
+            n_x = robot.num_positions()+robot.num_velocities()
+            n_u = robot.num_actuators()
+            effort_limits = np.array([robot.get_joint_actuator(JointActuatorIndex(i)).effort_limit() for i in range(n_u)])
+            x = np.zeros((num_knot_points, n_x),  dtype = "object")
+            u = np.zeros((num_knot_points, n_u), dtype = "object")
+            #Adding program variables
+            for i in range(num_knot_points):
+                x[i] = prog.NewContinuousVariables(n_x, f"x_{i}")
+                u[i] = prog.NewContinuousVariables(n_u, f"u_{i}")
+
+            final_velocity = (2*g*)**0.5        
+
         pass
 
     def fetchStates(self, context):
