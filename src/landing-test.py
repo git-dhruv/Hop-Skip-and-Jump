@@ -15,6 +15,7 @@ from landing import landing
 from phase_switch import PhaseSwitch
 from osc_modified import OperationalSpaceWalkingController
 
+
 # %% [markdown]
 # # System Setup
 # 
@@ -70,6 +71,17 @@ builder.Connect(osc.torque_output_port, plant.get_actuation_input_port())
 vis_params = MeshcatVisualizerParams(publish_period=1e-4)
 MeshcatVisualizer.AddToBuilder(builder, scene_graph, meshcat, params=vis_params)
 
+from pydrake.systems.planar_scenegraph_visualizer import (
+    ConnectPlanarSceneGraphVisualizer)
+
+T_VW = np.array([[1., 0., 0., 0.],
+                    [0., 0., 1., 0.],
+                    [0., 0., 0., 1.]])
+
+visualizer = ConnectPlanarSceneGraphVisualizer(
+        builder, scene_graph, T_VW=T_VW, xlim=[-2.2, 2.2],
+        ylim=[-1.2, 3.2])
+
 #simulate
 diagram = builder.Build()
 graph = (pydot.graph_from_dot_data(diagram.GetGraphvizString(max_depth=2))[0].create_svg())
@@ -82,7 +94,7 @@ with open('graph.svg', 'wb') as f:
 # 
 
 # %%
-sim_time = 5
+sim_time = 2.5
 simulator = Simulator(diagram)
 simulator.Initialize(); simulator.set_target_realtime_rate(1)
 
@@ -90,19 +102,25 @@ simulator.Initialize(); simulator.set_target_realtime_rate(1)
 plant_context = diagram.GetMutableSubsystemContext(plant, simulator.get_mutable_context())
 
 q = np.zeros((plant.num_positions(),))
-q[0] = 0; q[1] = 1.6
-q[2] = 5e-2
-theta = 1e-2# -np.arccos(q[1])
-print(theta)
-q[3] = theta; q[4] = 2 * theta/5
-q[5] = theta;   q[6] = -2 * theta/5
+q[0] = 0; q[1] = 3.
+q[2] = 5e-3
+theta = -np.pi/10# -np.arccos(q[1])
+q[3] = -theta/3; q[4] = -2 * theta/5
+q[5] = theta/2;   q[6] = -2 * theta/4
 plant.SetPositions(plant_context, q)
+
+
+visualizer.start_recording()
+
 
 # Simulate the robot
 try:
     simulator.AdvanceTo(sim_time)
 except Exception as E:
     print(E)
+visualizer.stop_recording()
+ani = visualizer.get_recording_as_animation()
+ani.save(f"result.gif", fps=30)
 
 ## Logs and Plots ##
 log = logger.FindLog(simulator.get_mutable_context()) #xyz vxvyvz
@@ -115,6 +133,6 @@ plt.plot(t, x)
 plt.figure()
 plt.plot(t, xdot)
 # plt.savefig(f"./logs/{time}plots.png")
-plt.show()
+# plt.show()
 
 
