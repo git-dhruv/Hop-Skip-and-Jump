@@ -47,7 +47,7 @@ class landing(LeafSystem):
         # Make internal dynamics model to get the COM and stuff #
         self.plant = MultibodyPlant(0.0)
         self.parser = Parser(self.plant)
-        self.parser.AddModels("models/planar_walker.urdf")
+        self.parser.AddModels("/home/dhruv/Hop-Skip-and-Jump/models/planar_walker.urdf")
         self.plant.WeldFrames(
             self.plant.world_frame(),
             self.plant.GetBodyByName("base").body_frame(),
@@ -64,8 +64,12 @@ class landing(LeafSystem):
         # Output Ports #
         self.com_trajectory_output_port_index = self.DeclareAbstractOutputPort("comtraj", lambda: AbstractValue.Make(BasicVector(4)),self.comtrajCB).get_index()
 
-    def comtrajCB(self):
-        pass
+    def comtrajCB(self, context, output):
+        z_des = self.EvalVectorInput(context, self.com_des_input_port_index).value()
+        # #Calculate z_dd_des which I wont use anywhere
+        # z_dd_des = -(z_des - self.calcCOM(context)[-1])
+        ## As of now, we are just routing z_des 1 to 1
+        output.set_value(BasicVector(z_des))
     
     ## Port Accessors ##
     def get_state_input_port(self):

@@ -36,7 +36,7 @@ class OperationalSpaceWalkingController(LeafSystem):
         ### Internal Plant Model for simulation ###
         self.plant = MultibodyPlant(0.0)
         self.parser = Parser(self.plant)
-        self.parser.AddModels("../models/planar_walker.urdf")
+        self.parser.AddModels("/home/dhruv/Hop-Skip-and-Jump/models/planar_walker.urdf")
         self.plant.WeldFrames(
             self.plant.world_frame(),
             self.plant.GetBodyByName("base").body_frame(),
@@ -62,11 +62,11 @@ class OperationalSpaceWalkingController(LeafSystem):
         self.tracking_objectives = {
             "com_traj": CenterOfMassPositionTrackingObjective(
                 self.plant, self.plant_context, [LEFT_STANCE, RIGHT_STANCE],
-                np.diag([500, 0, 500]), np.diag([100, 0, 100])/10
+                np.diag([100, 0, 100]), np.diag([100, 0, 100])/10
             ),
             "base_joint_traj": JointAngleTrackingObjective(
                 self.plant, self.plant_context, [LEFT_STANCE, RIGHT_STANCE],
-                10*np.eye(1), np.eye(1), "planar_roty"
+                20*np.eye(1), np.eye(1), "planar_roty"
             )
         }
 
@@ -74,7 +74,7 @@ class OperationalSpaceWalkingController(LeafSystem):
         Wcom = np.eye(3,3)
         Wcom[1,1] = 0
         Wcom[2,2] = 4
-        Wcom[0,0] = 4
+        Wcom[0,0] = 1
 
         self.tracking_costs = {
             "com_traj": Wcom,
@@ -91,9 +91,8 @@ class OperationalSpaceWalkingController(LeafSystem):
 
         # Trajectory Input Ports
         # trj = BasicVector()
-        self.traj_input_ports = {
-            "com_traj": self.DeclareAbstractInputPort("com_traj", AbstractValue.Make(BasicVector(3))).get_index(),
-            "base_joint_traj": self.DeclareAbstractInputPort("base_joint_traj", AbstractValue.Make(BasicVector(1))).get_index()}
+        self.traj_input_ports = {"com_traj": self.DeclareAbstractInputPort("com_traj", AbstractValue.Make(BasicVector(3))).get_index(),
+                                "base_joint_traj": self.DeclareVectorInputPort("base_joint_traj", BasicVector(1)).get_index()}
 
         # Define the output ports
         self.torque_output_port = self.DeclareVectorOutputPort("u", self.plant.num_actuators(), self.CalcTorques)
@@ -126,6 +125,20 @@ class OperationalSpaceWalkingController(LeafSystem):
 
         
         output.SetFromVector(np.concatenate((com_pos, com_vel)))
+
+    def startLandingFlag(self):
+        for fsm in [0,1]:
+            stance_foot = self.contact_points[fsm]
+            stance_foot_pos = self.plant.CalcPointsPositions(
+                self.plant_context, 
+                stance_foot.frame, 
+                stance_foot.pt, 
+                self.plant.world_frame()
+            ).ravel()
+            
+            if stance_foot_pos[-1]<=1e-2:
+                return 1
+        return 0
 
     def get_traj_input_port(self, traj_name):
         return self.get_input_port(self.traj_input_ports[traj_name])
@@ -160,6 +173,9 @@ class OperationalSpaceWalkingController(LeafSystem):
         return J, JdotV
 
     def SetupAndSolveQP(self,  context: Context) -> Tuple[np.ndarray, MathematicalProgram]:
+        if self.startLandingFlag() == 0:
+            return self.u/1e5, self.u/1e5
+
 
         # First get the state, time, and fsm state
         x = self.EvalVectorInput(context, self.robot_state_input_port_index).get_value()
@@ -194,11 +210,9 @@ class OperationalSpaceWalkingController(LeafSystem):
             yii = JdotV_i + J_i@vdot
             prog.AddQuadraticCost((yddot_cmd_i - yii).T@W_i@(yddot_cmd_i - yii))
 
-            
-
-        # TODO: Add Quadratic Cost on vdot using self.gains.w_vdot
-        # prog.AddQuadraticCost(1e-1*vdot.T@vdot)
-
+        
+        prog.AddQuadraticCost(1e-3*(self.u - u).T@(self.u - u))
+        # prog.AddQuadraticCost(1e-1*u.T@u) ### Cant put a constrain on u!!!! Because it sucks!
 
         
         #I concatenate both contact Jacobians and then lamba c is modified to make 6,1
@@ -238,7 +252,7 @@ class OperationalSpaceWalkingController(LeafSystem):
 
         # Solve the QP
         solver = OsqpSolver()
-        prog.SetSolverOption(solver.id(), "max_iter", 2000)
+        prog.SetSolverOption(solver.id(), "eps_abs", 1e-5)
 
         result = solver.Solve(prog)
 
@@ -254,4 +268,5 @@ class OperationalSpaceWalkingController(LeafSystem):
 
     def CalcTorques(self, context: Context, output: BasicVector) -> None:
         usol, _ = self.SetupAndSolveQP(context)
+        self.u = usol
         output.SetFromVector(usol)

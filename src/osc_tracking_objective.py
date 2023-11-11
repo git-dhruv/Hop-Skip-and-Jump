@@ -61,8 +61,7 @@ class OperationalSpaceTrackingObjective(ABC):
         # yd_ddot = y_des_traj.derivative(2).value(t).ravel()
 
         # self.yddot_cmd =- self.kp @ (y - yd) - self.kd @ (ydot - yd_dot)
-        self.yddot_cmd = - self.kp @ (y - yd) - self.kd @ (ydot )
-        # print(self.yddot_cmd)
+        self.yddot_cmd = np.clip(- self.kp @ (y - yd) - self.kd @ (ydot), -1e5, 1e5)
 
     def GetJ(self):
         return self.J
