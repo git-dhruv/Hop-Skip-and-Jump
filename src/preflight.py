@@ -82,7 +82,7 @@ class dircol(LeafSystem):
                 x[i] = prog.NewContinuousVariables(n_x, f"x_{i}")
                 u[i] = prog.NewContinuousVariables(n_u, f"u_{i}")
 
-            final_velocity = (2*g*)**0.5        
+            # final_velocity = (2*g*)**0.5        
 
         pass
 
