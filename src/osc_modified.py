@@ -22,7 +22,7 @@ RIGHT_STANCE = 1
 
 
 class OperationalSpaceWalkingController(LeafSystem):
-    def __init__(self):
+    def __init__(self, torques):
         """
             Constructor for the operational space controller (Do Not Modify).
             We load a drake MultibodyPlant representing the planar walker
@@ -102,6 +102,9 @@ class OperationalSpaceWalkingController(LeafSystem):
         self.logging_port = self.DeclareVectorOutputPort("metrics", BasicVector(6), self.logCB)
 
         self.u = np.zeros((self.plant.num_actuators()))
+
+
+        self.utraj = torques
 
     def logCB(self, context, output):
         ### For now we are tracking the COM Z, Zdot and Zddot ###

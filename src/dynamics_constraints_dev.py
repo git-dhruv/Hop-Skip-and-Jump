@@ -65,8 +65,9 @@ def EvaluateDynamics(planar_arm, context, x, u, lambda_c):
     M_inv = np.linalg.inv(M)
   v_dot = M_inv @ (B @ u + g - C + J_c.T@lambda_c)
 
-  contact = J_c_dot_v + (J_c@v_dot).reshape(-1,1)
+  contact = (J_c@v_dot).reshape(-1,1) + J_c_dot_v
   return np.hstack((x[-n_v:], v_dot)), contact
+
 
 def CollocationConstraintEvaluator(planar_arm, context, dt, x_i, u_i, x_ip1, u_ip1, lambda_c_i, lambda_c_ip1, lambda_c_halfway):
   n_x = planar_arm.num_positions() + planar_arm.num_velocities()

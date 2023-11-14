@@ -2,7 +2,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import importlib
 from pydrake.all import (DiagramBuilder, Simulator, FindResourceOrThrow, MultibodyPlant, PiecewisePolynomial, SceneGraph,
-    Parser, JointActuatorIndex, MathematicalProgram, Solve)
+    Parser, JointActuatorIndex, MathematicalProgram, Solve, SolverType)
 from scipy.constants import g
 import dynamics_constraints
 from pydrake.math import RigidTransform
@@ -12,7 +12,7 @@ from dynamics_constraints_dev import (
   EvaluateDynamics
 )
 
-def find_throwing_trajectory(N, initial_state, final_state, tf, jumpheight_tol=5e-2):
+def find_throwing_trajectory(N, initial_state, jumpheight, tf, jumpheight_tol=5e-2):
   '''
   Parameters:
     N - number of knot points
@@ -23,7 +23,7 @@ def find_throwing_trajectory(N, initial_state, final_state, tf, jumpheight_tol=5
 
   builder = DiagramBuilder()
   plant = builder.AddSystem(MultibodyPlant(0.0))
-  file_name = "/home/anirudhkailaje/Documents/01_UPenn/02_MEAM5170/03_FinalProject/src/planar_walker.urdf"
+  file_name = "/home/dhruv/Hop-Skip-and-Jump/models/planar_walker.urdf"
   Parser(plant=plant).AddModels(file_name)
   plant.WeldFrames(plant.world_frame(),plant.GetBodyByName("base").body_frame(),RigidTransform.Identity())
   plant.Finalize()
@@ -41,8 +41,8 @@ def find_throwing_trajectory(N, initial_state, final_state, tf, jumpheight_tol=5
   # Store the actuator limits here
   effort_limits = np.array([robot.get_joint_actuator(JointActuatorIndex(act_idx)).effort_limit() for act_idx in range(n_u)])
   """Joint limits specified in the order [planar_x: m, planar_z:m, roty(torso_angle): radians, left_hip:radians, right_hip: radians, left_knee: radians, right_knee: radians]"""
-  joint_limit_lower = np.array([-1, 0, -0.9, -1.39, -1.39, 0, 0])
-  joint_limit_upper = np.array([1, 5, 0.6, 0.78, 0.78, 2.5, 2.5])
+  joint_limit_lower = np.array([-1, 0, -0.9, -1.39, -1.39, 0, 0])*1.4
+  joint_limit_upper = np.array([1, 5, 0.6, 0.78, 0.78, 2.5, 2.5])*1.4
   # vel_limits = 15 * np.ones(n_v)
 
   # Create the mathematical program and decision variables
@@ -64,14 +64,15 @@ def find_throwing_trajectory(N, initial_state, final_state, tf, jumpheight_tol=5
   initial_state_constraint = prog.AddLinearEqualityConstraint(x0, initial_state)
   initial_state_constraint.evaluator().set_description("Initial State Constraint")
 
-  prog.AddLinearEqualityConstraint(xf, final_state)
+  # prog.AddLinearEqualityConstraint(xf, final_state)
 
   """Jump velocity constraints"""
-  # required_velocity = (2*g*jumpheight)**0.5
-  # velocity_tol = np.array([(2*g*jumpheight_tol)**0.5])
+  required_velocity = (2*g*jumpheight)**0.5
+  velocity_tol = np.array([(2*g*jumpheight_tol)**0.5])
+  velocity_tol = 1e-2
   # prog.AddLinearEqualityConstraint(xf[n_q+1], final_configuration)
-  # final_zvel_constraint = prog.AddBoundingBoxConstraint(required_velocity-velocity_tol, required_velocity+velocity_tol, xf[n_q+1])
-  # final_zvel_constraint.evaluator().set_description("Final Z velocity constraint")
+  final_zvel_constraint = prog.AddBoundingBoxConstraint(required_velocity-velocity_tol, required_velocity+velocity_tol, xf[n_q+1])
+  final_zvel_constraint.evaluator().set_description("Final Z velocity constraint")
   # robot.SetPositionsAndVelocities(context, xf)
   # com_pos = robot.CalcCenterOfMassPositionInWorld(context).ravel()  
 
@@ -82,10 +83,13 @@ def find_throwing_trajectory(N, initial_state, final_state, tf, jumpheight_tol=5
 
   # TODO: Add the cost function here
   for i in range(N-1):
-       prog.AddQuadraticCost(0.5*50*(timesteps[i+1]-timesteps[i])*((u[i].T@u[i])+(u[i+1].T@u[i+1])))
-      #  prog.AddQuadraticCost(0.5*(x[i][2]-jumpheight)**2)
-       
+       prog.AddQuadraticCost(0.5*(timesteps[i+1]-timesteps[i])*((u[i].T@u[i])+(u[i+1].T@u[i+1])))
+       prog.AddQuadraticCost(0.5*100*(x[i][2])**2)
+       prog.AddQuadraticCost(0.5*50*(x[i][0])**2)
+       prog.AddLinearConstraint(x[i][1], 0, np.inf)
   # prog.AddQuadraticCost(0.5*(xf[n_q+1]-required_velocity)**2) #Cost on error in z-velocity
+
+  
 
   # TODO: Add bounding box constraints on the inputs and qdot 
 
@@ -95,7 +99,7 @@ def find_throwing_trajectory(N, initial_state, final_state, tf, jumpheight_tol=5
                   [0, 0, 0, 1, 0, -mu],    # Friction constraint for right foot, positive x-direction
                   [0, 0, 0, -1, 0, -mu]])  # Friction constraint for right foot, negative x-direction
   for i in range(N):
-      # joint_limit_constraints.append(prog.AddBoundingBoxConstraint(joint_limit_lower, joint_limit_upper, x[i, :n_q]))
+      # prog.AddBoundingBoxConstraint(joint_limit_lower, joint_limit_upper, x[i, :n_q])
       # joint_limit_constraints[i].evaluator().set_description(f"Joint limit @ knot point {i}")
       # prog.AddBoundingBoxConstraint(-vel_limits, vel_limits, x[i, n_q:n_q+n_v])
       prog.AddBoundingBoxConstraint(-effort_limits, effort_limits, u[i])
@@ -118,7 +122,7 @@ def find_throwing_trajectory(N, initial_state, final_state, tf, jumpheight_tol=5
   # x_guess = np.load("/home/anirudhkailaje/Documents/01_UPenn/02_MEAM5170/03_FinalProject/src/traj.npy")
   # x_init = x_guess[:, ::(x_guess.shape[1])//N][:,:N].T
 
-  x_init = np.linspace(initial_state, final_state, N)
+  x_init = np.linspace(initial_state, initial_state, N)
   u_init = np.random.uniform(low = -effort_limits, high = effort_limits, size=(N, n_u))/1e2
   lambda_init = np.zeros((N, 6))
   lambda_c_col_init = np.zeros((N-1, 6))
@@ -128,6 +132,8 @@ def find_throwing_trajectory(N, initial_state, final_state, tf, jumpheight_tol=5
   prog.SetInitialGuess(lambda_c, lambda_init)
   prog.SetInitialGuess(lambda_c_col, lambda_c_col_init)
 
+  print("Starting the solve")
+  prog.SetSolverOption(SolverType.kSnopt, "Major iterations limit", 50)
   # Set up solver
   result = Solve(prog)
   
@@ -137,8 +143,10 @@ def find_throwing_trajectory(N, initial_state, final_state, tf, jumpheight_tol=5
   # t_land_sol = result.GetSolution(t_land)
 
   print('optimal cost: ', result.get_optimal_cost())
-  print('x_sol: ', x_sol)
-  print('u_sol: ', u_sol)
+  print('x_sol: ', x_sol.round(2))
+  print('u_sol: ', u_sol.round())
+  print(required_velocity)
+  print(x_sol[-1][n_q+1])
   # print('t_land: ', t_land_sol)
 
   print(result.get_solution_result())
@@ -158,7 +166,7 @@ def find_throwing_trajectory(N, initial_state, final_state, tf, jumpheight_tol=5
   return x_traj, u_traj, prog, prog.GetInitialGuess(x), prog.GetInitialGuess(u)
   
 if __name__ == '__main__':
-  N = 5
+  N = 3
   initial_state = np.zeros(14)
   q = np.zeros((7,))
   q[0] = 0; q[1] = 0.8
@@ -169,5 +177,6 @@ if __name__ == '__main__':
   final_state = initial_state
   # final_configuration = np.array([np.pi, 0])
   tf = 3.0
-  x_traj, u_traj, prog,  _, _ = find_throwing_trajectory(N, initial_state, final_state=final_state, tf=1, jumpheight_tol=5e-2)
+  x_traj, u_traj, prog,  _, _ = find_throwing_trajectory(N, initial_state, 1.3, tf=1, jumpheight_tol=5e-2)
+  # x_traj, u_traj, prog,  _, _ = find_throwing_trajectory(N, initial_state, final_state=final_state, tf=1, jumpheight_tol=5e-2)
   print("Done")
