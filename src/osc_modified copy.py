@@ -17,7 +17,6 @@ from pydrake.math import RigidTransform
 from pydrake.multibody.all import JacobianWrtVariable
 from osc_tracking_objective import *
 
-
 LEFT_STANCE = 0
 RIGHT_STANCE = 1
 
@@ -63,11 +62,11 @@ class OperationalSpaceWalkingController(LeafSystem):
         self.tracking_objectives = {
             "com_traj": CenterOfMassPositionTrackingObjective(
                 self.plant, self.plant_context, [LEFT_STANCE, RIGHT_STANCE],
-                np.diag([100, 0, 100]), np.diag([100, 0, 100])/2
+                np.diag([500, 0, 500]), np.diag([100, 0, 100])/10
             ),
             "base_joint_traj": JointAngleTrackingObjective(
                 self.plant, self.plant_context, [LEFT_STANCE, RIGHT_STANCE],
-                50*np.eye(1), np.eye(1), "planar_roty"
+                10*np.eye(1), np.eye(1), "planar_roty"
             )
         }
 
@@ -92,10 +91,9 @@ class OperationalSpaceWalkingController(LeafSystem):
 
         # Trajectory Input Ports
         # trj = BasicVector()
-        print("chel")
         self.traj_input_ports = {
-            "com_traj": self.DeclareAbstractInputPort("com_traj", AbstractValue.Make(PiecewisePolynomial())).get_index(),
-            "base_joint_traj": self.DeclareAbstractInputPort("base_joint_traj", AbstractValue.Make(PiecewisePolynomial())).get_index()}
+            "com_traj": self.DeclareAbstractInputPort("com_traj", AbstractValue.Make(Trajectory())).get_index(),
+            "base_joint_traj": self.DeclareAbstractInputPort("base_joint_traj", AbstractValue.Make(BasicVector(1))).get_index()}
 
         # Define the output ports
         self.torque_output_port = self.DeclareVectorOutputPort("u", self.plant.num_actuators(), self.CalcTorques)

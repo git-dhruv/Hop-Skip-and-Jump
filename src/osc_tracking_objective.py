@@ -10,6 +10,8 @@ from pydrake.multibody.plant import MultibodyPlant
 from pydrake.multibody.all import JacobianWrtVariable
 
 
+
+
 @dataclass
 class PointOnFrame:
     '''
@@ -56,12 +58,17 @@ class OperationalSpaceTrackingObjective(ABC):
         self.J = self.CalcJ()
         self.JdotV = self.CalcJdotV()
 
-        yd = y_des_traj.value().ravel()
+        yd = y_des_traj.value(t).ravel()
+        if yd.shape[0] > 1:
+            yd = self.fetchStates(yd)
+        else:
+            print(yd)
         # yd_dot = y_des_traj.derivative(1).value(t).ravel()
         # yd_ddot = y_des_traj.derivative(2).value(t).ravel()
 
         # self.yddot_cmd =- self.kp @ (y - yd) - self.kd @ (ydot - yd_dot)
         self.yddot_cmd = - self.kp @ (y - yd) - self.kd @ (ydot )
+        # self.yddot_cmd = np.clip(self.yddot_cmd, -1e6, 1e6)
         # print(self.yddot_cmd)
 
     def GetJ(self):
@@ -72,6 +79,33 @@ class OperationalSpaceTrackingObjective(ABC):
 
     def GetYddotCmd(self):
         return self.yddot_cmd
+    
+    def fetchStates(self, state):
+        context = self.context
+        
+        #Get the internal robot to go to current state
+        self.plant.SetPositionsAndVelocities(self.context, state)
+        J = self.plant.CalcJacobianCenterOfMassTranslationalVelocity(self.context,JacobianWrtVariable.kV,self.plant.world_frame(),self.plant.world_frame())                                                                     
+        Jdv = self.plant.CalcBiasCenterOfMassTranslationalAcceleration(self.context,JacobianWrtVariable.kV,self.plant.world_frame(),self.plant.world_frame())
+        self.joint_pos_idx = self.plant.GetJointByName("planar_roty").position_start()
+        self.joint_vel_idx = self.plant.GetJointByName("planar_roty").velocity_start()
+
+
+        ## COM States ##        
+        com_pos = self.plant.CalcCenterOfMassPositionInWorld(self.context).ravel()        
+        return com_pos
+        com_vel = (J @ self.plant.GetVelocities(self.plant_context)).ravel()
+        """
+        com_acc = Jdv + J*vdot - dont know how to get the vdot
+        """        
+
+        ## Torso Angle States ##
+        torso_angle = self.plant.GetPositions(self.context)[self.joint_pos_idx:self.joint_pos_idx+1].ravel()
+        torso_ang_vel = self.plant.GetVelocities(self.context)[self.joint_vel_idx:self.joint_vel_idx+1].ravel()
+        statePacket = {'com_pos': com_pos, 'com_vel': com_vel, 'torso_ang': torso_angle, 'torso_ang_vel': torso_ang_vel}
+
+        return statePacket
+
 
     @abstractmethod
     def CalcJ(self) -> np.ndarray:

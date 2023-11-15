@@ -12,6 +12,35 @@ from dynamics_constraints_dev import (
   EvaluateDynamics
 )
 
+from dataclasses import dataclass
+from pydrake.multibody.tree import Frame
+
+@dataclass
+class PointOnFrame:
+    frame: Frame
+    pt: np.ndarray
+
+def get_foot_pos(context, plant):
+    contact_points = {
+    0: PointOnFrame(
+        plant.GetBodyByName("left_lower_leg").body_frame(),
+        np.array([0, 0, -0.5])
+    ),
+    1: PointOnFrame(
+        plant.GetBodyByName("right_lower_leg").body_frame(),
+        np.array([0, 0, -0.5])
+    )
+    }
+    ft = np.zeros((3,2))
+    i =0
+    for fsm in [0,1]:
+        pt_to_track = contact_points[fsm]
+        ft[:,i] = plant.CalcPointsPositions(context, pt_to_track.frame,
+                                        pt_to_track.pt, plant.world_frame()).ravel()
+        i+=1
+    return ft    
+
+
 def find_throwing_trajectory(N, initial_state, jumpheight, tf, jumpheight_tol=5e-2):
   '''
   Parameters:
@@ -86,7 +115,8 @@ def find_throwing_trajectory(N, initial_state, jumpheight, tf, jumpheight_tol=5e
        prog.AddQuadraticCost(0.5*(timesteps[i+1]-timesteps[i])*((u[i].T@u[i])+(u[i+1].T@u[i+1])))
        prog.AddQuadraticCost(0.5*100*(x[i][2])**2)
        prog.AddQuadraticCost(0.5*50*(x[i][0])**2)
-       prog.AddLinearConstraint(x[i][1], 0, np.inf)
+       prog.AddLinearConstraint(x[i][1], 0.6, 1.2)
+       prog.AddLinearConstraint(x[i][0], -1e-1, 1e-1)
   # prog.AddQuadraticCost(0.5*(xf[n_q+1]-required_velocity)**2) #Cost on error in z-velocity
 
   
@@ -107,7 +137,6 @@ def find_throwing_trajectory(N, initial_state, jumpheight, tf, jumpheight_tol=5e
       prog.AddLinearConstraint(A_fric @ lambda_c[i].reshape(6, 1), -np.inf * np.ones((4, 1)), np.zeros((4, 1)))
       prog.AddLinearEqualityConstraint(lambda_c[i][1] == 0)
       prog.AddLinearEqualityConstraint(lambda_c[i][4] == 0)
-
   for i in range(N-1):
       prog.AddLinearConstraint(A_fric @ lambda_c_col[i].reshape(6, 1), -np.inf * np.ones((4, 1)), np.zeros((4, 1)))
       prog.AddLinearEqualityConstraint(lambda_c_col[i][1] == 0)
@@ -133,7 +162,7 @@ def find_throwing_trajectory(N, initial_state, jumpheight, tf, jumpheight_tol=5e
   prog.SetInitialGuess(lambda_c_col, lambda_c_col_init)
 
   print("Starting the solve")
-  prog.SetSolverOption(SolverType.kSnopt, "Major iterations limit", 50)
+  prog.SetSolverOption(SolverType.kSnopt, "Major iterations limit", 20)
   # Set up solver
   result = Solve(prog)
   
