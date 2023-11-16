@@ -7,6 +7,47 @@ import numpy as np
 
 from pydrake.multibody.all import JacobianWrtVariable
 
+def optyaw(des:float,curr:float) -> float:
+    """
+        Black magic
+        Calculates the minimum angle of rotation for yaw between the desired and current yaw angles. 
+        The angle is calculated by performing a dot product of two vectors and determining the sign. 
+        The vectors are calculated by applying a rotation transformation to a base vector using the `rotz` method. 
+        The resulting vectors are then normalized. 
+        
+        Parameters:
+        desired_yaw (float): The desired yaw angle in radians.
+        current_yaw (float): The current yaw angle in radians.
+        
+        Returns:
+        float: The minimum angle of rotation for yaw in radians. If the angle is very small (less than 0.001), the function returns zero.
+
+
+        Warning: This code was written for my MEAM620 Yaw controller. It is adapted for this project and is not refined in terms of code quality.  
+    """
+    def rotz(ang):
+        ang = float(ang)
+        c = np.cos(ang)
+        s = np.sin(ang)
+        return np.array([[c ,-s],[s, c]])
+    def wrapper(y) :
+        return np.arctan2(np.sin(y), np.cos(y))
+
+    basevec = np.array([1,0]).reshape(-1,1)
+    currvec = rotz(curr)@basevec
+    desvec = rotz(des)@basevec
+
+    currvec = currvec/np.linalg.norm(currvec)
+    desvec = desvec/np.linalg.norm(desvec)
+
+    shortestAngle = wrapper(np.arccos(currvec.T.dot(desvec)))
+    if np.abs(shortestAngle)<0.001:
+        return np.array([0])
+    cr = np.cross(currvec.T,desvec.T)
+    sign = np.sign(cr)
+
+    return (sign*shortestAngle).flatten()
+
 class valueFetcher:
     def __init__(self, trajtype):
         self.type = trajtype #1 means polytraj
@@ -21,13 +62,16 @@ class pid:
         self.Kp = Kp; self.Kd = Kd
         self.saturations = saturations
 
-    def calcOut(self, y, ydes, ydot):
+    def calcOut(self, y, ydes, ydot, angular = 0):
         #Don't use ydot if value too high
         if np.linalg.norm(ydot)> self.saturations:
             print("Velocity Term too high!", ydot)
             ydot = self.saturations*ydot/np.linalg.norm(ydot)
+        e = ydes - y
+        if angular:
+            e = optyaw(ydes, y)
 
-        out = self.Kp@(ydes-y) - self.Kd@ydot
+        out = self.Kp@e - self.Kd@ydot
 
         return np.clip(out, -self.saturations, self.saturations)
 
@@ -100,11 +144,11 @@ class fetchTorsoParams:
         y = self.CalcY()
         ydot = self.CalcYdot()        
         yd = self.getVal.getVal(ydes, t)
-        y = np.arctan2(np.sin(y), np.cos(y))
-        yd = np.arctan2(np.sin(yd), np.cos(yd))
+        # y = np.arctan2(np.sin(y), np.cos(y))
+        # yd = np.arctan2(np.sin(yd), np.cos(yd))
 
         self.desiredPos = yd; self.desiredVel = yd*0
-        return self.pid.calcOut(y, yd, ydot)
+        return self.pid.calcOut(y, yd, ydot, angular=1)
 
     def CalcY(self) -> np.ndarray:
         return self.plant.GetPositions(self.context)[self.joint_pos_idx:self.joint_pos_idx+1].ravel()

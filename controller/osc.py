@@ -38,7 +38,7 @@ class OSC(LeafSystem):
         TorsoParams = {'Kp': np.diag([5]), 'Kd': np.diag([1]) , 'saturations': 15*np.pi/180} #Max Lim: 5 deg/s
         ## Cost Weights ##
         self.WCOM = np.eye(3,3)
-        self.WTorso = np.diag([5*np.pi/180*(self.WCOM.max()/10)]) #Maybe a consistant way to set the weights
+        self.WTorso = np.diag([0.01]) #Maybe a consistant way to set the weights - 5*np.pi/180*(self.WCOM.max()/10)
         self.Costs = {'COM': self.WCOM, 'torso' : self.WTorso} 
         ##_______________________________________________##
 
