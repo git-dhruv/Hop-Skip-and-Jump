@@ -27,6 +27,8 @@ def fetchStates(context, plant):
     joint_pos_idx = plant.GetJointByName("planar_roty").position_start()
     joint_vel_idx = plant.GetJointByName("planar_roty").velocity_start()
     torso_angle = plant.GetPositions(context)[joint_pos_idx:joint_pos_idx+1].ravel()
+
+    torso_angle = np.arctan2(np.sin(torso_angle), np.cos(torso_angle))
     torso_ang_vel = plant.GetVelocities(context)[joint_vel_idx:joint_vel_idx+1].ravel()
 
     ## Foot Positions ##
