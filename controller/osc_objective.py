@@ -62,10 +62,14 @@ class fetchCOMParams:
 
         self.getVal = valueFetcher(polyTraj)
 
+        self.desiredPos = np.zeros((params['Kp'].shape[0],)); self.desiredVel = np.zeros((params['Kp'].shape[0],))
+
     def getAcc(self, ydes, t):
         y = self.CalcY()
         ydot = self.CalcYdot()    
         yd = self.getVal.getVal(ydes, t)    
+
+        self.desiredPos = yd; self.desiredVel = yd*0
         return self.pid.calcOut(y, yd, ydot)
 
     def CalcY(self) -> np.ndarray:
@@ -89,11 +93,17 @@ class fetchTorsoParams:
         self.joint_pos_idx = self.plant.GetJointByName("planar_roty").position_start()
         self.joint_vel_idx = self.plant.GetJointByName("planar_roty").velocity_start()
         self.getVal = valueFetcher(polytraj)
+
+        self.desiredPos = np.zeros((params['Kp'].shape[0],)); self.desiredVel = np.zeros((params['Kp'].shape[0],))
  
     def getAcc(self, ydes, t):
         y = self.CalcY()
         ydot = self.CalcYdot()        
         yd = self.getVal.getVal(ydes, t)
+        y = np.arctan2(np.sin(y), np.cos(y))
+        yd = np.arctan2(np.sin(yd), np.cos(yd))
+
+        self.desiredPos = yd; self.desiredVel = yd*0
         return self.pid.calcOut(y, yd, ydot)
 
     def CalcY(self) -> np.ndarray:

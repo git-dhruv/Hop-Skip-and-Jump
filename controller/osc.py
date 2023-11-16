@@ -13,7 +13,7 @@ from pydrake.trajectories import Trajectory, PiecewisePolynomial
 from pydrake.solvers import MathematicalProgram, OsqpSolver
 from pydrake.common.value import AbstractValue
 from pydrake.math import RigidTransform
-from utils import calculateDoubleContactJacobians
+from utils import calculateDoubleContactJacobians, fetchStates
 
 class OSC(LeafSystem):
     def __init__(self, urdf, polyTraj=0):
@@ -63,8 +63,60 @@ class OSC(LeafSystem):
         
         self.torque_output_port = self.DeclareVectorOutputPort("u", self.plant.num_actuators(), self.CalcTorques)
         self.u = np.zeros((self.plant.num_actuators()))
+
+        self.logging_port = self.DeclareVectorOutputPort("logs", BasicVector(24), self.logCB)
         ##_______________________________________________##
+
+        self.idx = None
+
+
+    def fetchTrackParams(self):
+        return {'COM_pos_d': self.tracking_objective.COMTracker.desiredPos, 'COM_vel_d':self.tracking_objective.COMTracker.desiredVel,
+               'Torso_pos_d': self.tracking_objective.TorsoTracker.desiredPos, 'Torso_vel_d':self.tracking_objective.TorsoTracker.desiredVel,
+               'Foot_pos_d': np.array([0]), 'Foot_vel_d': np.array([0])}
+                
+    def logParse(self, x):
+        #Parses the log data and returns in human readable form - test in ipynb
+        i = self.log_idx
+        COM_POS = x[:i[1],:]
+        COM_VEL = x[i[1]:i[2],:]
+        T_POS = x[i[2]:i[3],:]
+        T_VEL = x[i[3]:i[4],:]
+        left = x[i[4]:i[5],:]
+        right = x[i[5]:i[6],:]
+        COM_POS_DESIRED = x[i[6]:i[7],:]
+        COM_VEL_DESIRED = x[i[7]:i[8],:]
+        Torso_POS_DESIRED = x[i[8]:i[9],:]
+        Torso_VEL_DESIRED = x[i[9]:i[10],:]
+        Ft_POS_DESIRED = x[i[10]:i[11],:]
+        Ft_POS_DESIRED = x[i[11]:i[12],:]
+        return COM_POS, COM_VEL, T_POS, T_VEL, left, right, COM_POS_DESIRED, COM_VEL_DESIRED, Torso_POS_DESIRED, Torso_VEL_DESIRED, Ft_POS_DESIRED, Ft_POS_DESIRED
         
+    def logCB(self, context, output):
+        # COM, Torso Angle, Foot pos and velocities
+        statePacket = fetchStates(self.plant_context, self.plant)
+
+        # Desired COM, Torso, Desired Foot angles
+        trackPacket = self.fetchTrackParams()
+        
+
+        # Desired acceleration for the QP - not calculating now and assuming sats take care of it
+        
+        #Don't ask questions move on with your life
+        idx = [0]; outVector = None
+        for _, value in statePacket.items():
+            if len(idx)==1:
+                outVector = value.flatten()
+                idx.append(outVector.shape[0])
+            else:
+                outVector = np.concatenate((outVector, value.flatten()))
+                idx.append(outVector.shape[0])
+        for _, value in trackPacket.items():
+            outVector = np.concatenate((outVector, value.flatten()))
+            idx.append(outVector.shape[0])
+        
+        self.log_idx = idx
+        output.SetFromVector(outVector)        
 
     def solveQP(self, context):
         
