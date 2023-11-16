@@ -61,14 +61,13 @@ class OperationalSpaceTrackingObjective(ABC):
         yd = y_des_traj.value(t).ravel()
         if yd.shape[0] > 1:
             yd = self.fetchStates(yd)
-        else:
-            print(yd)
+
         # yd_dot = y_des_traj.derivative(1).value(t).ravel()
         # yd_ddot = y_des_traj.derivative(2).value(t).ravel()
 
         # self.yddot_cmd =- self.kp @ (y - yd) - self.kd @ (ydot - yd_dot)
         self.yddot_cmd = - self.kp @ (y - yd) - self.kd @ (ydot )
-        # self.yddot_cmd = np.clip(self.yddot_cmd, -1e6, 1e6)
+        self.yddot_cmd = np.clip(self.yddot_cmd, -10, 10)
         # print(self.yddot_cmd)
 
     def GetJ(self):

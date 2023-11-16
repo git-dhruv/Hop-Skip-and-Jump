@@ -112,12 +112,14 @@ def find_throwing_trajectory(N, initial_state, jumpheight, tf, jumpheight_tol=5e
 
   # TODO: Add the cost function here
   for i in range(N-1):
-       prog.AddQuadraticCost(0.5*(timesteps[i+1]-timesteps[i])*((u[i].T@u[i])+(u[i+1].T@u[i+1])))
-       prog.AddQuadraticCost(0.5*100*(x[i][2])**2)
-       prog.AddQuadraticCost(0.5*50*(x[i][0])**2)
-       prog.AddLinearConstraint(x[i][1], 0.6, 1.2)
+      #  prog.AddQuadraticCost(0.5*(timesteps[i+1]-timesteps[i])*((u[i].T@u[i])+(u[i+1].T@u[i+1])))
+       prog.AddQuadraticCost(0.5*(u[i] - u[i+1]).T @ (u[i] - u[i+1]).T)
+       prog.AddLinearConstraint(x[i][1], 0.5, 1)
        prog.AddLinearConstraint(x[i][0], -1e-1, 1e-1)
-  # prog.AddQuadraticCost(0.5*(xf[n_q+1]-required_velocity)**2) #Cost on error in z-velocity
+       prog.AddLinearConstraint(x[i][2], -1e-4, 1e-4)
+       if i<N//2:
+        prog.AddLinearConstraint(x[i][7+1], -required_velocity*0.5, required_velocity*0.5)
+        prog.AddLinearConstraint(x[i][7], -1e-2, 1e-2)
 
   
 
@@ -152,7 +154,7 @@ def find_throwing_trajectory(N, initial_state, jumpheight, tf, jumpheight_tol=5e
   # x_init = x_guess[:, ::(x_guess.shape[1])//N][:,:N].T
 
   x_init = np.linspace(initial_state, initial_state, N)
-  u_init = np.random.uniform(low = -effort_limits, high = effort_limits, size=(N, n_u))/1e2
+  u_init = np.random.uniform(low = -effort_limits, high = effort_limits, size=(N, n_u))/1e1
   lambda_init = np.zeros((N, 6))
   lambda_c_col_init = np.zeros((N-1, 6))
   
@@ -162,7 +164,7 @@ def find_throwing_trajectory(N, initial_state, jumpheight, tf, jumpheight_tol=5e
   prog.SetInitialGuess(lambda_c_col, lambda_c_col_init)
 
   print("Starting the solve")
-  prog.SetSolverOption(SolverType.kSnopt, "Major iterations limit", 20)
+  prog.SetSolverOption(SolverType.kSnopt, "Major iterations limit", 60)
   # Set up solver
   result = Solve(prog)
   
