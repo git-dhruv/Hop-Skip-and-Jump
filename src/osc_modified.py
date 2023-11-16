@@ -63,19 +63,16 @@ class OperationalSpaceWalkingController(LeafSystem):
         self.tracking_objectives = {
             "com_traj": CenterOfMassPositionTrackingObjective(
                 self.plant, self.plant_context, [LEFT_STANCE, RIGHT_STANCE],
-                np.diag([100, 0, 100]), np.diag([100, 0, 100])/2
+                np.diag([100, 0, 100])/100, np.diag([100, 0, 100])/2
             ),
             "base_joint_traj": JointAngleTrackingObjective(
                 self.plant, self.plant_context, [LEFT_STANCE, RIGHT_STANCE],
-                50*np.eye(1), np.eye(1), "planar_roty"
+                5*np.eye(1), np.eye(1), "planar_roty"
             )
         }
 
         ### @ask ta about this non convexity ###
         Wcom = np.eye(3,3)
-        Wcom[1,1] = 0
-        Wcom[2,2] = 4
-        Wcom[0,0] = 4
 
         self.tracking_costs = {
             "com_traj": Wcom,
@@ -243,7 +240,7 @@ class OperationalSpaceWalkingController(LeafSystem):
 
         # Solve the QP
         solver = OsqpSolver()
-        prog.SetSolverOption(solver.id(), "max_iter", 2000)
+        prog.SetSolverOption(solver.id(), "max_iter", 6000)
 
         result = solver.Solve(prog)
 

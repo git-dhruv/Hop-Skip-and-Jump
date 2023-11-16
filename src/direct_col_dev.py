@@ -113,10 +113,13 @@ def find_throwing_trajectory(N, initial_state, jumpheight, tf, jumpheight_tol=5e
   # TODO: Add the cost function here
   for i in range(N-1):
        prog.AddQuadraticCost(0.5*(timesteps[i+1]-timesteps[i])*((u[i].T@u[i])+(u[i+1].T@u[i+1])))
-       prog.AddQuadraticCost(0.5*100*(x[i][2])**2)
-       prog.AddQuadraticCost(0.5*50*(x[i][0])**2)
-       prog.AddLinearConstraint(x[i][1], 0.6, 1.2)
+       prog.AddLinearConstraint(x[i][1], 0.2, 1.0)
        prog.AddLinearConstraint(x[i][0], -1e-1, 1e-1)
+       if i<N-2:
+         prog.AddLinearConstraint(x[i][n_q+1], -np.inf, required_velocity-10*velocity_tol)
+
+
+
   # prog.AddQuadraticCost(0.5*(xf[n_q+1]-required_velocity)**2) #Cost on error in z-velocity
 
   
