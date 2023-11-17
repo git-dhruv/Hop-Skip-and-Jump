@@ -35,7 +35,7 @@ plant.RegisterCollisionGeometry(
     "collision", CoulombFriction(1.0, 1.0))
 
 #Make the plant
-urdf = r"/home/dhruv/Hop-Skip-and-Jump/models/planar_walker.urdf"
+urdf = r"/home/anirudhkailaje/Documents/01_UPenn/02_MEAM5170/03_FinalProject/src/planar_walker.urdf"
 parser = Parser(plant)
 parser.AddModels(urdf)
 plant.WeldFrames(
@@ -77,8 +77,9 @@ MeshcatVisualizer.AddToBuilder(builder, scene_graph, meshcat, params=vis_params)
 #simulate
 diagram = builder.Build()
 graph = (pydot.graph_from_dot_data(diagram.GetGraphvizString(max_depth=2))[0].create_svg())
-# with f as open("graph.svg", "w"):
-#     f.write(graph)
+
+with open("OSCgraph.svg", "wb") as f:
+    f.write(graph)
 ################
 
 sim_time = 20
