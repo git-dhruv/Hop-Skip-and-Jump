@@ -65,13 +65,19 @@ class pid:
     def calcOut(self, y, ydes, ydot, angular = 0):
         #Don't use ydot if value too high
         if np.linalg.norm(ydot)> self.saturations:
-            print("Velocity Term too high!", ydot)
+            # print("Velocity Term too high!", ydot)
             ydot = self.saturations*ydot/np.linalg.norm(ydot)
         e = ydes - y
         if angular:
             e = optyaw(ydes, y)
+            out = self.Kp@e - self.Kd@ydot
+        else:
+            target = np.array([0,0,y[2]])
+            out = self.Kp@(target-y) + self.Kd@(ydes - ydot)
+            if ydot[-1] < ydes[-1]*0.9:
+                out[-1] += 9.81 
 
-        out = self.Kp@e - self.Kd@ydot
+
 
         return np.clip(out, -self.saturations, self.saturations)
 
@@ -144,8 +150,6 @@ class fetchTorsoParams:
         y = self.CalcY()
         ydot = self.CalcYdot()        
         yd = self.getVal.getVal(ydes, t)
-        # y = np.arctan2(np.sin(y), np.cos(y))
-        # yd = np.arctan2(np.sin(yd), np.cos(yd))
 
         self.desiredPos = yd; self.desiredVel = yd*0
         return self.pid.calcOut(y, yd, ydot, angular=1)

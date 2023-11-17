@@ -41,3 +41,4 @@ def fetchStates(context, plant):
     statePacket = {'com_pos': com_pos, 'com_vel': com_vel, 'torso_ang': torso_angle, 'torso_ang_vel': torso_ang_vel,
                    'left_leg': left, 'right_leg': right }
     return statePacket
+

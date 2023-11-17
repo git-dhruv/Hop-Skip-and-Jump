@@ -34,8 +34,8 @@ class OSC(LeafSystem):
 
         ## ___________Parameters for tracking___________ ##
         self.whatToTrack = ['COM', 'torso']
-        COMParams = {'Kp': np.diag([100, 0, 100]), 'Kd': np.diag([100, 0, 100])/10 , 'saturations': 10} #Max Lim: 1 G
-        TorsoParams = {'Kp': np.diag([5]), 'Kd': np.diag([1]) , 'saturations': 15*np.pi/180} #Max Lim: 5 deg/s
+        COMParams = {'Kp': np.diag([60, 0, 60]), 'Kd': np.diag([100, 0, 100])/6 , 'saturations': 20} #Max Lim: 1 G
+        TorsoParams = {'Kp': np.diag([5]), 'Kd': np.diag([2]) , 'saturations': 15*np.pi/180} #Max Lim: 5 deg/s
         ## Cost Weights ##
         self.WCOM = np.eye(3,3)
         self.WTorso = np.diag([0.01]) #Maybe a consistant way to set the weights - 5*np.pi/180*(self.WCOM.max()/10)
@@ -116,16 +116,26 @@ class OSC(LeafSystem):
             idx.append(outVector.shape[0])
         
         self.log_idx = idx
+        self.acc = 0
         output.SetFromVector(outVector)        
 
     def solveQP(self, context):
-        
         ## Get the context from the diagram ##
         x = self.EvalVectorInput(context, self.robot_state_input_port_index).get_value()
         t = context.get_time()
 
         ## Update the internal context ##
         self.plant.SetPositionsAndVelocities(self.plant_context, x)
+
+        stancefoot = fetchStates(self.plant_context, self.plant)
+        if stancefoot['left_leg'][-1]>=1e-2 or stancefoot['right_leg'][-1]>=1e-2:
+            print(x[8], t, self.acc)
+            return 10*self.u/np.linalg.norm(self.u+1e-3)
+        if t<0.42:
+            return 10*self.u/np.linalg.norm(self.u+1e-3)
+
+
+
 
         ## Create the Mathematical Program ##
         qp = MathematicalProgram()
@@ -178,15 +188,19 @@ class OSC(LeafSystem):
         # Solve the QP
         solver = OsqpSolver()
         qp.SetSolverOption(solver.id(), "max_iter", self.max_iter)
+        qp.SetInitialGuess(u, self.u)
 
         result = solver.Solve(qp)
 
         # If we exceed iteration limits use the previous solution
-        if not result.is_success():
+        if not result.is_success():            
             print("Solver not working, pal!!!")
             usol = self.u
         else:
             usol = result.GetSolution(u)
+            self.acc = result.GetSolution(vdot)
+            if(np.linalg.norm(usol)>1e3):
+                return 1e3*usol/np.linalg.norm(usol)
             self.u = usol        
 
         return usol
