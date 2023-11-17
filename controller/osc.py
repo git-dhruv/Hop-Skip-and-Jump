@@ -5,6 +5,7 @@ Tracks Desired COM with both feet on ground
 
 import numpy as np
 from osc_objective import tracking_objective
+import osc_objective_2
 
 from pydrake.multibody.plant import MultibodyPlant
 from pydrake.multibody.parsing import Parser
@@ -49,6 +50,7 @@ class OSC(LeafSystem):
 
         # !WARNING : IT IS ASSUMED THAT OSC AND OSC_TRACKING SHARE THE SAME PLANT!
         self.tracking_objective = tracking_objective(self.plant, self.plant_context, COMParams, TorsoParams, None, polyTraj=polyTraj)
+        self.tracking_objective_land = osc_objective_2.tracking_objective(self.plant, self.plant_context, COMParams, TorsoParams, None, polyTraj=polyTraj)
 
 
         ## ______________Declaring Ports______________ ##        
@@ -67,7 +69,7 @@ class OSC(LeafSystem):
         self.logging_port = self.DeclareVectorOutputPort("logs", BasicVector(24), self.logCB)
         ##_______________________________________________##
 
-        self.idx = None
+        self.idx = None; self.angles_to_maintain = None
 
 
     def fetchTrackParams(self):
@@ -119,6 +121,8 @@ class OSC(LeafSystem):
         self.acc = 0
         output.SetFromVector(outVector)        
 
+        
+
     def solveQP(self, context):
         ## Get the context from the diagram ##
         x = self.EvalVectorInput(context, self.robot_state_input_port_index).get_value()
@@ -129,10 +133,23 @@ class OSC(LeafSystem):
 
         stancefoot = fetchStates(self.plant_context, self.plant)
         if stancefoot['left_leg'][-1]>=1e-2 or stancefoot['right_leg'][-1]>=1e-2:
-            print(x[8], t, self.acc)
-            return 10*self.u/np.linalg.norm(self.u+1e-3)
+            # Main the joint angles!    
+            if self.angles_to_maintain is None:            
+                return self.u/np.linalg.norm(self.u+1e-3)
+            else:
+                from osc_objective import optyaw
+                err = [0]*4
+                for i in range(4):                    
+                    err[i] = optyaw(self.angles_to_maintain[i], x[3+i])
+                err = np.array(err)
+                out = -5e-3*(2.5*err - 0.2*x[-4:].reshape(-1,1)).flatten()
+                # out[0] *= -1
+                # out[-1] *= -1
+                return      out
         if t<0.42:
-            return 10*self.u/np.linalg.norm(self.u+1e-3)
+            return self.u/np.linalg.norm(self.u+1e-3)
+        from copy import deepcopy
+        self.angles_to_maintain = deepcopy(x[3:7])
 
 
 
@@ -150,7 +167,10 @@ class OSC(LeafSystem):
             cost = self.Costs[track]
             
             #Get what to track and system states
-            yddot_cmd_i, J_i, JdotV_i = self.tracking_objective.Update(t, traj, track)
+            if t<1.2:
+                yddot_cmd_i, J_i, JdotV_i = self.tracking_objective.Update(t, traj, track)
+            else:
+                yddot_cmd_i, J_i, JdotV_i = self.tracking_objective_land.Update(t, traj, track)
 
             yii = JdotV_i + J_i@vdot
             qp.AddQuadraticCost( (yddot_cmd_i - yii).T@cost@(yddot_cmd_i - yii) )
@@ -194,7 +214,7 @@ class OSC(LeafSystem):
 
         # If we exceed iteration limits use the previous solution
         if not result.is_success():            
-            print("Solver not working, pal!!!")
+            print("Solver not working, pal!!!  ", t)
             usol = self.u
         else:
             usol = result.GetSolution(u)
