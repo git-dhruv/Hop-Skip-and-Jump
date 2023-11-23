@@ -34,34 +34,37 @@ class OSC(LeafSystem):
 
 
         ## ___________Parameters for tracking___________ ##
-        self.whatToTrack = ['COM', 'torso']
-        COMParams = {'Kp': np.diag([60, 0, 60]), 'Kd': np.diag([100, 0, 100])/6 , 'saturations': 20} #Max Lim: 1 G
+        self.whatToTrack = ['COM', 'torso', 'foot']
+        COMParams = {'Kp': np.diag([60, 0, 60]), 'Kd': np.diag([100, 0, 100])/60 , 'saturations': 20} #Max Lim: 1 G
         TorsoParams = {'Kp': np.diag([5]), 'Kd': np.diag([2]) , 'saturations': 15*np.pi/180} #Max Lim: 5 deg/s
+        footParams = {'Kp': 700*np.eye(3,3), 'Kd': 30*np.eye(3,3) , 'saturations': 50000} #Max Lim: 10 m/s2
         ## Cost Weights ##
         self.WCOM = np.eye(3,3)
         self.WTorso = np.diag([0.01]) #Maybe a consistant way to set the weights - 5*np.pi/180*(self.WCOM.max()/10)
-        self.Costs = {'COM': self.WCOM, 'torso' : self.WTorso} 
+        self.wFoot = np.array([[2,0,0],[0,2,0],[0,0,2]])
+        self.Costs = {'COM': self.WCOM, 'torso' : self.WTorso, 'foot': self.wFoot} 
         ##_______________________________________________##
 
         ## ______________Solver Parameters______________ ##
-        self.max_iter = 3000
+        self.max_iter = 30000
         ##_______________________________________________##
 
 
         # !WARNING : IT IS ASSUMED THAT OSC AND OSC_TRACKING SHARE THE SAME PLANT!
-        self.tracking_objective = tracking_objective(self.plant, self.plant_context, COMParams, TorsoParams, None, polyTraj=polyTraj)
-        self.tracking_objective_land = osc_objective_2.tracking_objective(self.plant, self.plant_context, COMParams, TorsoParams, None, polyTraj=polyTraj)
+        self.tracking_objective_air = osc_objective_2.tracking_objective(self.plant, self.plant_context, None, None, footParams, polyTraj=polyTraj)
+        self.tracking_objective_land = tracking_objective(self.plant, self.plant_context, COMParams, TorsoParams, None, polyTraj=polyTraj)
 
 
         ## ______________Declaring Ports______________ ##        
         self.robot_state_input_port_index = self.DeclareVectorInputPort("x", self.plant.num_positions() + self.plant.num_velocities()).get_index()
         if polyTraj:
-            intype = [PiecewisePolynomial(),PiecewisePolynomial()]
+            intype = [PiecewisePolynomial(),PiecewisePolynomial(), PiecewisePolynomial()]
         else:
-            intype = [BasicVector(3),BasicVector(1)]
+            intype = [BasicVector(3),BasicVector(1), BasicVector(6)]
         self.traj_input_ports = {
             self.whatToTrack[0]: self.DeclareAbstractInputPort("com_traj", AbstractValue.Make(intype[0])).get_index(),
-            self.whatToTrack[1]: self.DeclareAbstractInputPort("base_joint_traj", AbstractValue.Make(intype[1])).get_index()}
+            self.whatToTrack[1]: self.DeclareAbstractInputPort("base_joint_traj", AbstractValue.Make(intype[1])).get_index(),
+            self.whatToTrack[2]: self.DeclareAbstractInputPort("foot_traj", AbstractValue.Make(intype[2])).get_index()}
         
         self.torque_output_port = self.DeclareVectorOutputPort("u", self.plant.num_actuators(), self.CalcTorques)
         self.u = np.zeros((self.plant.num_actuators()))
@@ -69,12 +72,12 @@ class OSC(LeafSystem):
         self.logging_port = self.DeclareVectorOutputPort("logs", BasicVector(24), self.logCB)
         ##_______________________________________________##
 
-        self.idx = None; self.angles_to_maintain = None
+        self.idx = None; self.inAir = 0; 
 
 
     def fetchTrackParams(self):
-        return {'COM_pos_d': self.tracking_objective.COMTracker.desiredPos, 'COM_vel_d':self.tracking_objective.COMTracker.desiredVel,
-               'Torso_pos_d': self.tracking_objective.TorsoTracker.desiredPos, 'Torso_vel_d':self.tracking_objective.TorsoTracker.desiredVel,
+        return {'COM_pos_d': self.tracking_objective_land.COMTracker.desiredPos, 'COM_vel_d':self.tracking_objective_land.COMTracker.desiredVel,
+               'Torso_pos_d': self.tracking_objective_land.TorsoTracker.desiredPos, 'Torso_vel_d':self.tracking_objective_land.TorsoTracker.desiredVel,
                'Foot_pos_d': np.array([0]), 'Foot_vel_d': np.array([0])}
                 
     def logParse(self, x):
@@ -132,24 +135,12 @@ class OSC(LeafSystem):
         self.plant.SetPositionsAndVelocities(self.plant_context, x)
 
         stancefoot = fetchStates(self.plant_context, self.plant)
-        if stancefoot['left_leg'][-1]>=1e-2 or stancefoot['right_leg'][-1]>=1e-2:
-            # Main the joint angles!    
-            if self.angles_to_maintain is None:            
-                return self.u/np.linalg.norm(self.u+1e-3)
-            else:
-                from osc_objective import optyaw
-                err = [0]*4
-                for i in range(4):                    
-                    err[i] = optyaw(self.angles_to_maintain[i], x[3+i])
-                err = np.array(err)
-                out = -5e-3*(2.5*err - 0.2*x[-4:].reshape(-1,1)).flatten()
-                # out[0] *= -1
-                # out[-1] *= -1
-                return      out
-        if t<0.42:
-            return self.u/np.linalg.norm(self.u+1e-3)
-        from copy import deepcopy
-        self.angles_to_maintain = deepcopy(x[3:7])
+        if stancefoot['left_leg'][-1]>=1e-2 and stancefoot['right_leg'][-1]>=1e-2:
+            self.inAir = 1
+            self.previnAir = t
+            
+        else:
+            self.inAir = 0
 
 
 
@@ -165,17 +156,22 @@ class OSC(LeafSystem):
             #Get desired trajectory and costs
             traj = self.EvalAbstractInput(context, self.traj_input_ports[track]).get_value()
             cost = self.Costs[track]
-            
-            #Get what to track and system states
-            if t<1.2:
-                yddot_cmd_i, J_i, JdotV_i = self.tracking_objective.Update(t, traj, track)
-            else:
-                yddot_cmd_i, J_i, JdotV_i = self.tracking_objective_land.Update(t, traj, track)
 
-            yii = JdotV_i + J_i@vdot
-            qp.AddQuadraticCost( (yddot_cmd_i - yii).T@cost@(yddot_cmd_i - yii) )
+            if self.inAir and 'foot' in track:
+                for fsm in [0, 1]:
+                    # Get what to track and system states
+                    yddot_cmd_i, J_i, JdotV_i = self.tracking_objective_air.Update(t, traj, track, fsm)
+                    yii = JdotV_i + J_i@vdot
+                    qp.AddQuadraticCost( (yddot_cmd_i - yii).T@cost@(yddot_cmd_i - yii) )
 
-        
+            elif ('foot' not in track) and (self.inAir==0):
+                #Get what to track and system states
+                yddot_cmd_i, J_i, JdotV_i = self.tracking_objective_land.Update(t, traj, track)    
+                yii = JdotV_i + J_i@vdot
+                qp.AddQuadraticCost( (yddot_cmd_i - yii).T@cost@(yddot_cmd_i - yii) )
+
+        # qp.AddQuadraticCost( 1e-7*u.T@u )
+        # qp.AddQuadraticCost(0.01*(self.u-u).T@(self.u-u) )
         # Calculate terms in the manipulator equation
         M = self.plant.CalcMassMatrix(self.plant_context)
         Cv = self.plant.CalcBiasTerm(self.plant_context)    
@@ -185,29 +181,32 @@ class OSC(LeafSystem):
         B = self.plant.MakeActuationMatrix()
 
         #Calculate Contact Jacobians
-        J_c, J_c_dot_v = calculateDoubleContactJacobians(self.plant, self.plant_context)
+        if self.inAir == 0:
+            J_c, J_c_dot_v = calculateDoubleContactJacobians(self.plant, self.plant_context)
+            #Dynamics
+            qp.AddLinearEqualityConstraint(M@vdot + Cv + G - B@u - J_c.T@lambda_c, np.zeros((7,)))
+            #Contact
+            qp.AddLinearEqualityConstraint(J_c_dot_v + (J_c@vdot).reshape(-1,1), np.zeros((6,1)))
+            # Friction Cone Constraint
+            mu = 1
+            A_fric = np.array([[1, 0, -mu, 0, 0, 0], # Friction constraint for left foot, positive x-direction
+                            [-1, 0, -mu, 0, 0, 0],   # Friction constraint for left foot, negative x-direction
+                            [0, 0, 0, 1, 0, -mu],    # Friction constraint for right foot, positive x-direction
+                            [0, 0, 0, -1, 0, -mu]])  # Friction constraint for right foot, negative x-direction
 
-        #Dynamics
-        qp.AddLinearEqualityConstraint(M@vdot + Cv + G - B@u - J_c.T@lambda_c, np.zeros((7,)))
-
-        #Contact
-        qp.AddLinearEqualityConstraint(J_c_dot_v + (J_c@vdot).reshape(-1,1), np.zeros((6,1)))
-
-        # Friction Cone Constraint
-        mu = 1
-        A_fric = np.array([[1, 0, -mu, 0, 0, 0], # Friction constraint for left foot, positive x-direction
-                        [-1, 0, -mu, 0, 0, 0],   # Friction constraint for left foot, negative x-direction
-                        [0, 0, 0, 1, 0, -mu],    # Friction constraint for right foot, positive x-direction
-                        [0, 0, 0, -1, 0, -mu]])  # Friction constraint for right foot, negative x-direction
-
-        # The constraint is applied to the 6x1 lambda_c vector
-        qp.AddLinearConstraint(A_fric @ lambda_c.reshape(6, 1), -np.inf * np.ones((4, 1)), np.zeros((4, 1)))
-        qp.AddLinearEqualityConstraint(lambda_c[1] == 0)
-        qp.AddLinearEqualityConstraint(lambda_c[4] == 0)
+            # The constraint is applied to the 6x1 lambda_c vector
+            qp.AddLinearConstraint(A_fric @ lambda_c.reshape(6, 1), -np.inf * np.ones((4, 1)), np.zeros((4, 1)))
+            qp.AddLinearEqualityConstraint(lambda_c[1] == 0)
+            qp.AddLinearEqualityConstraint(lambda_c[4] == 0)
+        else:
+            qp.AddLinearEqualityConstraint(M@vdot + Cv + G - B@u, np.zeros((7,)))
+        for i in range(len(u)):
+            qp.AddLinearConstraint(u[i], np.array([-1400]), np.array([1400]))
 
         # Solve the QP
         solver = OsqpSolver()
         qp.SetSolverOption(solver.id(), "max_iter", self.max_iter)
+        qp.SetSolverOption(solver.id(), "eps_abs", 1e-5)
         qp.SetInitialGuess(u, self.u)
 
         result = solver.Solve(qp)
@@ -219,10 +218,11 @@ class OSC(LeafSystem):
         else:
             usol = result.GetSolution(u)
             self.acc = result.GetSolution(vdot)
-            if(np.linalg.norm(usol)>1e3):
-                return 1e3*usol/np.linalg.norm(usol)
             self.u = usol        
-
+        if  np.linalg.norm(usol)>1400:
+            usol = 1400*usol/np.linalg.norm(usol)
+        import time
+        # time.sleep(0.05)
         return usol
 
     ## Ignore ##

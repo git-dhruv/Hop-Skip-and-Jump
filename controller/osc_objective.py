@@ -72,10 +72,10 @@ class pid:
             e = optyaw(ydes, y)
             out = self.Kp@e - self.Kd@ydot
         else:
-            target = np.array([0,0,y[2]])
-            out = self.Kp@(target-y) + self.Kd@(ydes - ydot)
-            if ydot[-1] < ydes[-1]*0.9:
-                out[-1] += 9.81 
+            target = np.array([0,0,0.6])
+            out = self.Kp@(target-y) + self.Kd@( - ydot)
+            # if ydot[-1] < ydes[-1]*0.9:
+            #     out[-1] += 9.81 
 
 
 

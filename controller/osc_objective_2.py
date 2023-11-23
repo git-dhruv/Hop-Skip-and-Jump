@@ -4,7 +4,7 @@
 import numpy as np
 
 
-
+from utils import fetchStates
 from pydrake.multibody.all import JacobianWrtVariable
 
 def optyaw(des:float,curr:float) -> float:
@@ -72,8 +72,7 @@ class pid:
             e = optyaw(ydes, y)
             out = self.Kp@e - self.Kd@ydot
         else:
-            target = np.array([ydes[0],0,0.5])
-            out = self.Kp@(target-y) + self.Kd@(-ydot)
+            out = self.Kp[:3]@(e) + self.Kd[:3]@(-ydot)
 
 
 
@@ -93,14 +92,13 @@ class tracking_objective:
 
         
 
-    def Update(self, t, y_des, objective):
+    def Update(self, t, y_des, objective, fsm=0):
         if 'COM' in objective:
             return self.COMTracker.getAcc(y_des, t), self.COMTracker.CalcJ(), self.COMTracker.CalcJdotV() 
         if 'torso' in objective:
             return self.TorsoTracker.getAcc(y_des, t) , self.TorsoTracker.CalcJ(), self.TorsoTracker.CalcJdotV()
         if 'foot' in objective:
-            raise NotImplementedError
-            return self.FootTracker.getAcc(y_des, t)         
+            return self.FootTracker.getAcc(y_des, t, fsm), self.FootTracker.CalcJ(), self.FootTracker.CalcJdotV()         
         raise Exception("What the fuck have you provided in objective?")
 
 class fetchCOMParams:
@@ -166,9 +164,60 @@ class fetchTorsoParams:
         return 0
 
 class fetchFootParams:
-    def __init__(self, params, plant, context):
+    def __init__(self, params, plant, context, polyTraj):
         self.pid = pid(params['Kp'], params['Kd'], params['saturations'])
+        # self.pid = pid(params['Kp'], params['Kd'], params['saturations'])
         self.plant = plant; self.context = context
 
-    def getAcc(self, ydes, t):
-        pass
+        self.getVal = valueFetcher(polyTraj)
+
+        self.desiredPos = np.zeros((params['Kp'].shape[0],)); self.desiredVel = np.zeros((params['Kp'].shape[0],))
+
+    def getAcc(self, ydes, t, fsm):
+        self.fsm = fsm
+        y = self.CalcY()
+        ydot = self.CalcYdot()    
+        yd = self.getVal.getVal(ydes, t)    
+        com = fetchStates(self.context, self.plant )['com_pos']
+        if fsm:
+            target = np.array([com[0]+0.3, 0 , np.clip(com[-1]-0.6,0, np.inf)])
+        else:
+            target = np.array([com[0]-0.3, 0 , np.clip(com[-1]-0.6,0, np.inf)])
+
+        self.desiredPos = target; self.desiredVel = target*0
+        return self.pid.calcOut(y, target, ydot)
+
+
+    def CalcY(self) -> np.ndarray:
+        if self.fsm:
+            return self.plant.CalcPointsPositions(self.context, self.plant.GetBodyByName("left_lower_leg").body_frame(),
+                                        np.array([0, 0, -0.5]), self.plant.world_frame()).ravel()
+        return self.plant.CalcPointsPositions(self.context, self.plant.GetBodyByName("right_lower_leg").body_frame(),
+                                        np.array([0, 0, -0.5]), self.plant.world_frame()).ravel()
+
+
+    def CalcJ(self) -> np.ndarray:
+        if self.fsm:
+            return self.plant.CalcJacobianTranslationalVelocity(
+                self.context, JacobianWrtVariable.kV, self.plant.GetBodyByName("left_lower_leg").body_frame(),
+                np.array([0,0,-0.5]), self.plant.world_frame(), self.plant.world_frame())
+        else:
+            return self.plant.CalcJacobianTranslationalVelocity(
+                self.context, JacobianWrtVariable.kV, self.plant.GetBodyByName("right_lower_leg").body_frame(),
+                np.array([0,0,-0.5]), self.plant.world_frame(), self.plant.world_frame())
+
+
+    def CalcYdot(self) -> np.ndarray:
+        return (self.CalcJ() @ self.plant.GetVelocities(self.context)).ravel()
+
+    def CalcJdotV(self) -> np.ndarray:
+        if self.fsm:
+            return self.plant.CalcBiasTranslationalAcceleration(
+                self.context, JacobianWrtVariable.kV, self.plant.GetBodyByName("left_lower_leg").body_frame(),
+                np.array([0,0,-0.5]), self.plant.world_frame(), self.plant.world_frame()).ravel()
+        else:
+            return self.plant.CalcBiasTranslationalAcceleration(
+                self.context, JacobianWrtVariable.kV, self.plant.GetBodyByName("right_lower_leg").body_frame(),
+                np.array([0,0,-0.5]), self.plant.world_frame(), self.plant.world_frame()).ravel()
+
+
