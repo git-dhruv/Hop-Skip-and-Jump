@@ -85,6 +85,9 @@ def EvaluateDynamics(planar_arm, context, x, u, lambda_c):
     M_inv = np.linalg.inv(M)
   v_dot = M_inv @ (B @ u + g - C + J_c.T@lambda_c)
 
+  # M@vdot + Cv + G - B@u - J_c.T@lambda_c
+  # M@vdot = -Cv - G + Bu - J
+
   contact = (J_c@v_dot).reshape(-1,1) + J_c_dot_v
 
   foot = 0#get_foot_pos(context, planar_arm)

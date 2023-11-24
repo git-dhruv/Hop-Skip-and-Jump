@@ -70,8 +70,8 @@ def find_throwing_trajectory(N, initial_state, jumpheight, tf, jumpheight_tol=5e
   # Store the actuator limits here
   effort_limits = np.array([robot.get_joint_actuator(JointActuatorIndex(act_idx)).effort_limit() for act_idx in range(n_u)])
   """Joint limits specified in the order [planar_x: m, planar_z:m, roty(torso_angle): radians, left_hip:radians, right_hip: radians, left_knee: radians, right_knee: radians]"""
-  joint_limit_lower = np.array([-1, 0, -0.9, -1.39, -1.39, 0, 0])*1.4
-  joint_limit_upper = np.array([1, 5, 0.6, 0.78, 0.78, 2.5, 2.5])*1.4
+  joint_limit_lower = np.array([-1e-1, 0, -1e-1, -3.14, 0, -3.14, 0])
+  joint_limit_upper = np.array([1e-1, 1, 1e-1, 3.14, 3.14, 3.14, 3.14])
   # vel_limits = 15 * np.ones(n_v)
 
   # Create the mathematical program and decision variables
@@ -114,12 +114,13 @@ def find_throwing_trajectory(N, initial_state, jumpheight, tf, jumpheight_tol=5e
   for i in range(N-1):
       #  prog.AddQuadraticCost(0.5*(timesteps[i+1]-timesteps[i])*((u[i].T@u[i])+(u[i+1].T@u[i+1])))
        prog.AddQuadraticCost(0.5*(u[i] - u[i+1]).T @ (u[i] - u[i+1]).T)
-       prog.AddLinearConstraint(x[i][1], 0.5, 1)
-       prog.AddLinearConstraint(x[i][0], -1e-1, 1e-1)
+       prog.AddLinearConstraint(x[i][1], 0.6, 1)
+       prog.AddLinearConstraint(x[i][0], -1e-2, 1e-2)
        prog.AddLinearConstraint(x[i][2], -1e-4, 1e-4)
-       if i<N//2:
-        prog.AddLinearConstraint(x[i][7+1], -required_velocity*0.5, required_velocity*0.5)
-        prog.AddLinearConstraint(x[i][7], -1e-2, 1e-2)
+       prog.AddLinearConstraint(x[i][1] - x[i+1][1], -1e-1, 1e-1)
+      #  if i<N//2:
+      #   prog.AddLinearConstraint(x[i][7+1], -required_velocity*0.5, required_velocity*0.5)
+      #   prog.AddLinearConstraint(x[i][7], -1e-2, 1e-2)
 
   
 
@@ -131,7 +132,7 @@ def find_throwing_trajectory(N, initial_state, jumpheight, tf, jumpheight_tol=5e
                   [0, 0, 0, 1, 0, -mu],    # Friction constraint for right foot, positive x-direction
                   [0, 0, 0, -1, 0, -mu]])  # Friction constraint for right foot, negative x-direction
   for i in range(N):
-      # prog.AddBoundingBoxConstraint(joint_limit_lower, joint_limit_upper, x[i, :n_q])
+      prog.AddBoundingBoxConstraint(joint_limit_lower, joint_limit_upper, x[i, :n_q])
       # joint_limit_constraints[i].evaluator().set_description(f"Joint limit @ knot point {i}")
       # prog.AddBoundingBoxConstraint(-vel_limits, vel_limits, x[i, n_q:n_q+n_v])
       prog.AddBoundingBoxConstraint(-effort_limits, effort_limits, u[i])
@@ -164,7 +165,7 @@ def find_throwing_trajectory(N, initial_state, jumpheight, tf, jumpheight_tol=5e
   prog.SetInitialGuess(lambda_c_col, lambda_c_col_init)
 
   print("Starting the solve")
-  prog.SetSolverOption(SolverType.kSnopt, "Major iterations limit", 60)
+  prog.SetSolverOption(SolverType.kSnopt, "Major iterations limit", 1000)
   # Set up solver
   result = Solve(prog)
   

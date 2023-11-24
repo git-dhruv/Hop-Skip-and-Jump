@@ -29,6 +29,8 @@ def find_throwing_trajectory(N, initial_state, jumpheight, tf, jumpheight_tol=5e
   builder = DiagramBuilder()
   plant = builder.AddSystem(MultibodyPlant(0.0))
   file_name = "/home/anirudhkailaje/Documents/01_UPenn/02_MEAM5170/03_FinalProject/src/planar_walker.urdf"
+# file_name = "/home/dhruv/Hop-Skip-and-Jump/models/planar_walker.urdf"
+
   Parser(plant=plant).AddModels(file_name)
   plant.WeldFrames(plant.world_frame(),plant.GetBodyByName("base").body_frame(),RigidTransform.Identity())
   plant.Finalize()

@@ -59,16 +59,17 @@ class OperationalSpaceTrackingObjective(ABC):
         self.JdotV = self.CalcJdotV()
 
         yd = y_des_traj.value(t).ravel()
+        yd_ddot = 0
         if yd.shape[0] > 1:
             yd = self.fetchStates(yd)
+            acc = y_des_traj.derivative(2).value(t).ravel()
+            yd_ddot = np.array([acc[0], 0, acc[1]]) #Scheme
+            # yd[0] = y[0]; yd[2] = 0.8
+            # print(y - yd)
 
-        # yd_dot = y_des_traj.derivative(1).value(t).ravel()
-        # yd_ddot = y_des_traj.derivative(2).value(t).ravel()
-
-        # self.yddot_cmd =- self.kp @ (y - yd) - self.kd @ (ydot - yd_dot)
-        self.yddot_cmd = - self.kp @ (y - yd) - self.kd @ (ydot )
-        self.yddot_cmd = np.clip(self.yddot_cmd, -10, 10)
-        # print(self.yddot_cmd)
+        self.yddot_cmd = yd_ddot - self.kp @ (y - yd) - self.kd @ (ydot)
+        self.yddot_cmd = np.clip(self.yddot_cmd, -30, 30)
+        
 
     def GetJ(self):
         return self.J
@@ -80,30 +81,27 @@ class OperationalSpaceTrackingObjective(ABC):
         return self.yddot_cmd
     
     def fetchStates(self, state):
-        context = self.context
+        from pydrake.multibody.plant import MultibodyPlant
+        from pydrake.multibody.parsing import Parser
+        from pydrake.math import RigidTransform
+
+        plant = MultibodyPlant(0.0)
+        parser = Parser(plant)
+        parser.AddModels("../models/planar_walker.urdf")
+        plant.WeldFrames(
+            plant.world_frame(),
+            plant.GetBodyByName("base").body_frame(),
+            RigidTransform.Identity()
+        )
+        plant.Finalize()
+        
+
+        context = plant.CreateDefaultContext()
         
         #Get the internal robot to go to current state
-        self.plant.SetPositionsAndVelocities(self.context, state)
-        J = self.plant.CalcJacobianCenterOfMassTranslationalVelocity(self.context,JacobianWrtVariable.kV,self.plant.world_frame(),self.plant.world_frame())                                                                     
-        Jdv = self.plant.CalcBiasCenterOfMassTranslationalAcceleration(self.context,JacobianWrtVariable.kV,self.plant.world_frame(),self.plant.world_frame())
-        self.joint_pos_idx = self.plant.GetJointByName("planar_roty").position_start()
-        self.joint_vel_idx = self.plant.GetJointByName("planar_roty").velocity_start()
-
-
-        ## COM States ##        
-        com_pos = self.plant.CalcCenterOfMassPositionInWorld(self.context).ravel()        
+        plant.SetPositionsAndVelocities(context, state)
+        com_pos = plant.CalcCenterOfMassPositionInWorld(context).ravel()        
         return com_pos
-        com_vel = (J @ self.plant.GetVelocities(self.plant_context)).ravel()
-        """
-        com_acc = Jdv + J*vdot - dont know how to get the vdot
-        """        
-
-        ## Torso Angle States ##
-        torso_angle = self.plant.GetPositions(self.context)[self.joint_pos_idx:self.joint_pos_idx+1].ravel()
-        torso_ang_vel = self.plant.GetVelocities(self.context)[self.joint_vel_idx:self.joint_vel_idx+1].ravel()
-        statePacket = {'com_pos': com_pos, 'com_vel': com_vel, 'torso_ang': torso_angle, 'torso_ang_vel': torso_ang_vel}
-
-        return statePacket
 
 
     @abstractmethod

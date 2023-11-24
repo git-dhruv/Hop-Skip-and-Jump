@@ -7,11 +7,12 @@ from typing import List, Tuple
 
 from pydrake.multibody.plant import MultibodyPlant
 from pydrake.multibody.parsing import Parser
+from pydrake.math import RigidTransform
+
 from pydrake.systems.framework import Context, LeafSystem, BasicVector
 from pydrake.trajectories import Trajectory, PiecewisePolynomial
 from pydrake.solvers import MathematicalProgram, OsqpSolver
 from pydrake.common.value import AbstractValue
-from pydrake.math import RigidTransform
 
 
 from pydrake.multibody.all import JacobianWrtVariable
@@ -63,7 +64,7 @@ class OperationalSpaceWalkingController(LeafSystem):
         self.tracking_objectives = {
             "com_traj": CenterOfMassPositionTrackingObjective(
                 self.plant, self.plant_context, [LEFT_STANCE, RIGHT_STANCE],
-                np.diag([100, 0, 100]), np.diag([100, 0, 100])/2
+                np.diag([60, 0, 60]), np.diag([100, 0, 100])/5
             ),
             "base_joint_traj": JointAngleTrackingObjective(
                 self.plant, self.plant_context, [LEFT_STANCE, RIGHT_STANCE],
@@ -204,6 +205,8 @@ class OperationalSpaceWalkingController(LeafSystem):
         # TODO: Add Quadratic Cost on vdot using self.gains.w_vdot
         # prog.AddQuadraticCost(1e-1*vdot.T@vdot)
 
+        for i in range(len(u)):
+            prog.AddLinearConstraint(u[i], np.array([-1400]), np.array([1400]))
 
         
         #I concatenate both contact Jacobians and then lamba c is modified to make 6,1
@@ -227,6 +230,7 @@ class OperationalSpaceWalkingController(LeafSystem):
 
         #Contact
         prog.AddLinearEqualityConstraint(J_c_dot_v + (J_c@vdot).reshape(-1,1), np.zeros((6,1)))
+        
 
         # Friction Cone Constraint
         mu = 1
@@ -243,7 +247,9 @@ class OperationalSpaceWalkingController(LeafSystem):
 
         # Solve the QP
         solver = OsqpSolver()
-        prog.SetSolverOption(solver.id(), "max_iter", 2000)
+        prog.SetSolverOption(solver.id(), "max_iter", 20000)
+        prog.SetInitialGuess(u, self.u)
+
 
         result = solver.Solve(prog)
 
