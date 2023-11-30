@@ -40,12 +40,13 @@ class OSC(LeafSystem):
 
         ## ___________Parameters for tracking___________ ##
         self.whatToTrack = ['COM', 'torso', 'foot']
-        COMParams = {'Kp': np.diag([60, 0, 60]), 'Kd': np.diag([100, 0, 100])/60 , 'saturations': 20} #Max Lim: 1 G
-        TorsoParams = {'Kp': np.diag([5]), 'Kd': np.diag([2]) , 'saturations': 15*np.pi/180} #Max Lim: 5 deg/s
+        
+        COMParams = {'Kp': np.diag([60, 0, 60]), 'Kd': np.diag([100, 0, 100])/5 , 'saturations': 20} #Max Lim: 1 G
+        TorsoParams = {'Kp': np.diag([50]), 'Kd': np.diag([2]) , 'saturations': 15*np.pi/180} #Max Lim: 5 deg/s
         footParams = {'Kp': 700*np.eye(3,3), 'Kd': 30*np.eye(3,3) , 'saturations': 50000} #Max Lim: 10 m/s2
         ## Cost Weights ##
         self.WCOM = np.eye(3,3)
-        self.WTorso = np.diag([0.01]) #Maybe a consistant way to set the weights - 5*np.pi/180*(self.WCOM.max()/10)
+        self.WTorso = np.diag([0.1]) #Maybe a consistant way to set the weights - 5*np.pi/180*(self.WCOM.max()/10)
         self.wFoot = np.array([[2,0,0],[0,2,0],[0,0,2]])
         self.Costs = {'COM': self.WCOM, 'torso' : self.WTorso, 'foot': self.wFoot} 
         ##_______________________________________________##
@@ -74,10 +75,12 @@ class OSC(LeafSystem):
         self.torque_output_port = self.DeclareVectorOutputPort("u", self.plant.num_actuators(), self.CalcTorques)
         self.u = np.zeros((self.plant.num_actuators()))
 
-        self.logging_port = self.DeclareVectorOutputPort("logs", BasicVector(24), self.logCB)
+        self.logging_port = self.DeclareVectorOutputPort("logs", BasicVector(30), self.logCB)
         ##_______________________________________________##
 
         self.idx = None; self.inAir = 0; 
+    
+        self.whatToTrack = ['COM', 'torso']
 
 
     def fetchTrackParams(self):
@@ -140,6 +143,7 @@ class OSC(LeafSystem):
         self.plant.SetPositionsAndVelocities(self.plant_context, x)
 
         stancefoot = fetchStates(self.plant_context, self.plant)
+        
         if stancefoot['left_leg'][-1]>=1e-2 and stancefoot['right_leg'][-1]>=1e-2:
             self.inAir = 1
             self.previnAir = t
@@ -147,7 +151,7 @@ class OSC(LeafSystem):
         else:
             self.inAir = 0
 
-
+        self.inAir = 0
 
 
         ## Create the Mathematical Program ##

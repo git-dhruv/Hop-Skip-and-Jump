@@ -81,21 +81,8 @@ class OperationalSpaceTrackingObjective(ABC):
         return self.yddot_cmd
     
     def fetchStates(self, state):
-        from pydrake.multibody.plant import MultibodyPlant
-        from pydrake.multibody.parsing import Parser
-        from pydrake.math import RigidTransform
-
-        plant = MultibodyPlant(0.0)
-        parser = Parser(plant)
-        parser.AddModels("../models/planar_walker.urdf")
-        plant.WeldFrames(
-            plant.world_frame(),
-            plant.GetBodyByName("base").body_frame(),
-            RigidTransform.Identity()
-        )
-        plant.Finalize()
         
-
+        plant = deepcopy(self.plant)    
         context = plant.CreateDefaultContext()
         
         #Get the internal robot to go to current state

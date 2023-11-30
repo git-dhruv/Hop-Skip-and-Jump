@@ -4,6 +4,13 @@
 import numpy as np
 from utils import fetchStates
 from pydrake.multibody.all import JacobianWrtVariable
+from pydrake.multibody.plant import MultibodyPlant
+from pydrake.multibody.parsing import Parser
+from pydrake.math import RigidTransform
+
+PREFLIGHT = 0
+FLIGHT = 1
+LAND = 2
 
 def optyaw(des:float,curr:float) -> float:
     """
@@ -60,7 +67,7 @@ class pid:
         self.Kp = Kp; self.Kd = Kd
         self.saturations = saturations
 
-    def calcOut(self, y, ydes, ydot, angular = 0):
+    def calcOut(self, y, ydes, ydot, yddotdes, angular = 0):
         #Don't use ydot if value too high
         if np.linalg.norm(ydot)> self.saturations:
             ydot = self.saturations*ydot/np.linalg.norm(ydot)
@@ -70,7 +77,7 @@ class pid:
             e = optyaw(ydes, y)
             out = self.Kp@e - self.Kd@ydot
         else:
-            out = self.Kp@e - self.Kd@(ydot)
+            out = yddotdes + self.Kp@e - self.Kd@(ydot)
 
         return np.clip(out, -self.saturations, self.saturations)
 
@@ -88,9 +95,9 @@ class tracking_objective:
 
         
 
-    def Update(self, t, y_des, objective, footNum=0):
+    def Update(self, t, y_des, objective, footNum=0, finiteState=0):
         if 'COM' in objective:
-            return self.COMTracker.getAcc(y_des, t), self.COMTracker.CalcJ(), self.COMTracker.CalcJdotV() 
+            return self.COMTracker.getAcc(y_des, t, finiteState), self.COMTracker.CalcJ(), self.COMTracker.CalcJdotV() 
         if 'torso' in objective:
             return self.TorsoTracker.getAcc(y_des, t) , self.TorsoTracker.CalcJ(), self.TorsoTracker.CalcJdotV()
         if 'foot' in objective:
@@ -106,17 +113,30 @@ class fetchCOMParams:
 
         self.desiredPos = np.zeros((params['Kp'].shape[0],)); self.desiredVel = np.zeros((params['Kp'].shape[0],))
 
-    def getAcc(self, ydes, t):
-        y = self.CalcY()
-        ydot = self.CalcYdot()    
-        yd = self.getVal.getVal(ydes, t)
+    def getAcc(self, ydes, t, finiteState):
+        if finiteState == LAND:
+            yd = self.getVal.getVal(ydes, t)
+        if finiteState == PREFLIGHT:
+            # We dont care about the polytraj in Preflight because it will always be preflight
+            yd = self.getVal.getVal(ydes, t)
+            yd = self.convertStateToCOM(yd)
+            ## Yes these are state accelerations but we approximate base frame as COM
+            acc = ydes.derivative(2).value(t).ravel()
+            yd_ddotdes = np.array([acc[0], 0, acc[1]]) 
+
+            
+
         
         ## @WARN this is not added to the PID yet and is merely an accessor ##
         # if yddot_des is None:
         #     yddot_des = yd*0
 
+        y = self.CalcY()
+        ydot = self.CalcYdot()    
+
+
         self.desiredPos = yd; self.desiredVel = yd*0
-        return self.pid.calcOut(y, yd, ydot)
+        return self.pid.calcOut(y, yd, ydot, yd_ddotdes)
 
     def CalcY(self) -> np.ndarray:
         return self.plant.CalcCenterOfMassPositionInWorld(self.context).ravel()
@@ -129,6 +149,26 @@ class fetchCOMParams:
 
     def CalcJdotV(self) -> np.ndarray:
         return self.plant.CalcBiasCenterOfMassTranslationalAcceleration(self.context, JacobianWrtVariable.kV, self.plant.world_frame(), self.plant.world_frame()).ravel()
+    
+    def convertStateToCOM(self, state):
+        ## Replace this with deep copy of plant ##
+        from copy import deepcopy
+        plant = deepcopy(self.plant)
+        # plant = MultibodyPlant(0.0)
+        # parser = Parser(plant)
+        # parser.AddModels("../models/planar_walker.urdf")
+        # plant.WeldFrames(
+        #     plant.world_frame(),
+        #     plant.GetBodyByName("base").body_frame(),
+        #     RigidTransform.Identity()
+        # )
+        # plant.Finalize()
+        context = plant.CreateDefaultContext()        
+        #Get the internal robot to go to current state
+        plant.SetPositionsAndVelocities(context, state)
+        com_pos = plant.CalcCenterOfMassPositionInWorld(context).ravel()        
+        return com_pos
+
 
 
 
@@ -148,7 +188,7 @@ class fetchTorsoParams:
         yd = self.getVal.getVal(ydes, t)
 
         self.desiredPos = yd; self.desiredVel = yd*0
-        return self.pid.calcOut(y, yd, ydot, angular=1)
+        return self.pid.calcOut(y, yd, ydot, y*0 ,angular=1)
 
     def CalcY(self) -> np.ndarray:
         return self.plant.GetPositions(self.context)[self.joint_pos_idx:self.joint_pos_idx+1].ravel()
@@ -184,7 +224,7 @@ class fetchFootParams:
             target = np.array([com[0]-0.3, 0 , np.clip(com[-1]-0.6,0, np.inf)])
 
         self.desiredPos = target; self.desiredVel = target*0
-        return self.pid.calcOut(y, target, ydot)
+        return self.pid.calcOut(y, target, ydot, y*0)
 
 
     def CalcY(self) -> np.ndarray:
