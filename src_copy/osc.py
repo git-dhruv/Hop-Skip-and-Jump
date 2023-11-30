@@ -67,10 +67,18 @@ class OSC(LeafSystem):
             intype = [PiecewisePolynomial(),PiecewisePolynomial(), PiecewisePolynomial()]
         else:
             intype = [BasicVector(3),BasicVector(1), BasicVector(6)]
-        self.traj_input_ports = {
-            self.whatToTrack[0]: self.DeclareAbstractInputPort("com_traj", AbstractValue.Make(intype[0])).get_index(),
-            self.whatToTrack[1]: self.DeclareAbstractInputPort("base_joint_traj", AbstractValue.Make(intype[1])).get_index(),
-            self.whatToTrack[2]: self.DeclareAbstractInputPort("foot_traj", AbstractValue.Make(intype[2])).get_index()}
+        # self.traj_input_ports = {
+        #     self.whatToTrack[0]: self.DeclareAbstractInputPort("com_traj", AbstractValue.Make(intype[0])).get_index(),
+        #     self.whatToTrack[1]: self.DeclareAbstractInputPort("base_joint_traj", AbstractValue.Make(intype[1])).get_index(),
+        #     self.whatToTrack[2]: self.DeclareAbstractInputPort("foot_traj", AbstractValue.Make(intype[2])).get_index()}
+
+
+        self.dircolInput = self.DeclareAbstractInputPort("preflight",AbstractValue.Make(PiecewisePolynomial())).get_index()
+        self.flightInput = self.DeclareAbstractInputPort("flight", AbstractValue.Make(BasicVector(6))).get_index()
+        self.landInput = self.DeclareAbstractInputPort("landing", AbstractValue.Make(BasicVector(3))).get_index()
+
+        self.phaseInput = self.DeclareAbstractInputPort("phase", AbstractValue.Make(BasicVector(1))).get_index()
+        
         
         self.torque_output_port = self.DeclareVectorOutputPort("u", self.plant.num_actuators(), self.CalcTorques)
         self.u = np.zeros((self.plant.num_actuators()))
@@ -242,3 +250,15 @@ class OSC(LeafSystem):
         return self.get_input_port(self.traj_input_ports[traj_name])    
     def get_state_input_port(self):
         return self.get_input_port(self.robot_state_input_port_index)
+
+
+    def get_preflightinput_port_index(self):
+        return self.get_input_port(self.dircolInput)
+
+    def get_flightinput_port_index(self):
+        return self.get_input_port(self.flightInput)
+    def get_landinginput_port_index(self):
+        return self.get_input_port(self.landInput)
+
+    def get_phase_port_index(self):
+        return self.get_input_port(self.phaseInput)

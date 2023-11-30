@@ -70,8 +70,8 @@ class PhaseSwitch(LeafSystem):
         phase = self.DeterminePhase()
         output.set_value(BasicVector([phase]))
 
-    def get_preflight_port_index(self): return self.get_input_port(self.preflightoutput_trajectory_port_index)
-    def get_aerial_trajectory_port_index(self): return self.get_input_port(self.flightoutput_trajectory_port_index)
-    def get_landing_trajectory_port_index(self): return self.get_input_port(self.landingoutput_trajectory_port_index)
+    def get_preflight_port_index(self): return self.get_output_port(self.preflightoutput_trajectory_port_index)
+    def get_aerial_trajectory_port_index(self): return self.get_output_port(self.flightoutput_trajectory_port_index)
+    def get_landing_trajectory_port_index(self): return self.get_output_port(self.landingoutput_trajectory_port_index)
     def get_phase_switch_output_port_index(self): return self.get_output_port(self.phaseoutput_port_index)
     
