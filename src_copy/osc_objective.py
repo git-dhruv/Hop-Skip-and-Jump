@@ -2,9 +2,7 @@
 @brief: Given a Center of Mass or torso input, we calculate a desired acceleration based on gains
 """
 import numpy as np
-
-
-
+from utils import fetchStates
 from pydrake.multibody.all import JacobianWrtVariable
 
 def optyaw(des:float,curr:float) -> float:
@@ -54,7 +52,7 @@ class valueFetcher:
     
     def getVal(self,traj, t):
         if self.type == 1:
-            return traj.value(t).ravel()
+            return traj.value(t).ravel() #, traj.derivative(2).value(t).ravel()
         return traj.value().ravel()
 
 class pid:
@@ -65,19 +63,14 @@ class pid:
     def calcOut(self, y, ydes, ydot, angular = 0):
         #Don't use ydot if value too high
         if np.linalg.norm(ydot)> self.saturations:
-            # print("Velocity Term too high!", ydot)
             ydot = self.saturations*ydot/np.linalg.norm(ydot)
+
         e = ydes - y
         if angular:
             e = optyaw(ydes, y)
             out = self.Kp@e - self.Kd@ydot
         else:
-            target = np.array([0,0,0.6])
-            out = self.Kp@(target-y) + self.Kd@( - ydot)
-            # if ydot[-1] < ydes[-1]*0.9:
-            #     out[-1] += 9.81 
-
-
+            out = self.Kp@e - self.Kd@(ydot)
 
         return np.clip(out, -self.saturations, self.saturations)
 
@@ -95,14 +88,13 @@ class tracking_objective:
 
         
 
-    def Update(self, t, y_des, objective):
+    def Update(self, t, y_des, objective, footNum=0):
         if 'COM' in objective:
             return self.COMTracker.getAcc(y_des, t), self.COMTracker.CalcJ(), self.COMTracker.CalcJdotV() 
         if 'torso' in objective:
             return self.TorsoTracker.getAcc(y_des, t) , self.TorsoTracker.CalcJ(), self.TorsoTracker.CalcJdotV()
         if 'foot' in objective:
-            raise NotImplementedError
-            return self.FootTracker.getAcc(y_des, t)         
+            return self.FootTracker.getAcc(y_des, t, footNum), self.FootTracker.CalcJ(), self.FootTracker.CalcJdotV()         
         raise Exception("What the fuck have you provided in objective?")
 
 class fetchCOMParams:
@@ -117,7 +109,11 @@ class fetchCOMParams:
     def getAcc(self, ydes, t):
         y = self.CalcY()
         ydot = self.CalcYdot()    
-        yd = self.getVal.getVal(ydes, t)    
+        yd = self.getVal.getVal(ydes, t)
+        
+        ## @WARN this is not added to the PID yet and is merely an accessor ##
+        # if yddot_des is None:
+        #     yddot_des = yd*0
 
         self.desiredPos = yd; self.desiredVel = yd*0
         return self.pid.calcOut(y, yd, ydot)
@@ -168,9 +164,57 @@ class fetchTorsoParams:
         return 0
 
 class fetchFootParams:
-    def __init__(self, params, plant, context):
+    def __init__(self, params, plant, context, polyTraj):
         self.pid = pid(params['Kp'], params['Kd'], params['saturations'])
         self.plant = plant; self.context = context
 
-    def getAcc(self, ydes, t):
-        pass
+        self.getVal = valueFetcher(polyTraj)
+
+        self.desiredPos = np.zeros((params['Kp'].shape[0],)); self.desiredVel = np.zeros((params['Kp'].shape[0],))
+
+    def getAcc(self, ydes, t, fsm):
+        self.fsm = fsm
+        y = self.CalcY()
+        ydot = self.CalcYdot()    
+        yd = self.getVal.getVal(ydes, t)    
+        com = fetchStates(self.context, self.plant )['com_pos']
+        if fsm:
+            target = np.array([com[0]+0.3, 0 , np.clip(com[-1]-0.6,0, np.inf)])
+        else:
+            target = np.array([com[0]-0.3, 0 , np.clip(com[-1]-0.6,0, np.inf)])
+
+        self.desiredPos = target; self.desiredVel = target*0
+        return self.pid.calcOut(y, target, ydot)
+
+
+    def CalcY(self) -> np.ndarray:
+        if self.fsm:
+            return self.plant.CalcPointsPositions(self.context, self.plant.GetBodyByName("left_lower_leg").body_frame(),
+                                        np.array([0, 0, -0.5]), self.plant.world_frame()).ravel()
+        return self.plant.CalcPointsPositions(self.context, self.plant.GetBodyByName("right_lower_leg").body_frame(),
+                                        np.array([0, 0, -0.5]), self.plant.world_frame()).ravel()
+
+
+    def CalcJ(self) -> np.ndarray:
+        if self.fsm:
+            return self.plant.CalcJacobianTranslationalVelocity(
+                self.context, JacobianWrtVariable.kV, self.plant.GetBodyByName("left_lower_leg").body_frame(),
+                np.array([0,0,-0.5]), self.plant.world_frame(), self.plant.world_frame())
+        else:
+            return self.plant.CalcJacobianTranslationalVelocity(
+                self.context, JacobianWrtVariable.kV, self.plant.GetBodyByName("right_lower_leg").body_frame(),
+                np.array([0,0,-0.5]), self.plant.world_frame(), self.plant.world_frame())
+
+
+    def CalcYdot(self) -> np.ndarray:
+        return (self.CalcJ() @ self.plant.GetVelocities(self.context)).ravel()
+
+    def CalcJdotV(self) -> np.ndarray:
+        if self.fsm:
+            return self.plant.CalcBiasTranslationalAcceleration(
+                self.context, JacobianWrtVariable.kV, self.plant.GetBodyByName("left_lower_leg").body_frame(),
+                np.array([0,0,-0.5]), self.plant.world_frame(), self.plant.world_frame()).ravel()
+        else:
+            return self.plant.CalcBiasTranslationalAcceleration(
+                self.context, JacobianWrtVariable.kV, self.plant.GetBodyByName("right_lower_leg").body_frame(),
+                np.array([0,0,-0.5]), self.plant.world_frame(), self.plant.world_frame()).ravel()

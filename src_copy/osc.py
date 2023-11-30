@@ -11,7 +11,6 @@ Tracks Desired COM with both feet on ground
 
 import numpy as np
 from osc_objective import tracking_objective
-import osc_objective_2
 
 from pydrake.multibody.plant import MultibodyPlant
 from pydrake.multibody.parsing import Parser
@@ -57,7 +56,7 @@ class OSC(LeafSystem):
 
 
         # !WARNING : IT IS ASSUMED THAT OSC AND OSC_TRACKING SHARE THE SAME PLANT!
-        self.tracking_objective_air = osc_objective_2.tracking_objective(self.plant, self.plant_context, None, None, footParams, polyTraj=polyTraj)
+        self.tracking_objective_air = tracking_objective(self.plant, self.plant_context, None, None, footParams, polyTraj=polyTraj)
         self.tracking_objective_land = tracking_objective(self.plant, self.plant_context, COMParams, TorsoParams, None, polyTraj=polyTraj)
 
 
