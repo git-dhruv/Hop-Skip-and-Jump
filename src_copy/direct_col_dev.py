@@ -157,8 +157,8 @@ def find_throwing_trajectory(N, initial_state, jumpheight, tf, jumpheight_tol=5e
   # x_guess = np.load("/home/anirudhkailaje/Documents/01_UPenn/02_MEAM5170/03_FinalProject/src/traj.npy")
   # x_init = x_guess[:, ::(x_guess.shape[1])//N][:,:N].T
 
-  x_init = np.load('/home/dhruv/Hop-Skip-and-Jump/src_copy/x.npy')#np.linspace(initial_state, initial_state, N)
-  u_init = np.load('/home/dhruv/Hop-Skip-and-Jump/src_copy/u.npy') #np.random.uniform(low = -effort_limits, high = effort_limits, size=(N, n_u))/1e1
+  x_init = np.load('/home/dhruv/Hop-Skip-and-Jump/x.npy')#np.linspace(initial_state, initial_state, N)
+  u_init = np.load('/home/dhruv/Hop-Skip-and-Jump/u.npy') #np.random.uniform(low = -effort_limits, high = effort_limits, size=(N, n_u))/1e1
   lambda_init = np.zeros((N, 8))
   lambda_c_col_init = np.zeros((N-1, 8))
   
