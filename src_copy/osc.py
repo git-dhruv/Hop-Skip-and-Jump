@@ -114,7 +114,6 @@ class OSC(LeafSystem):
         # Desired COM, Torso, Desired Foot angles
         trackPacket = self.fetchTrackParams()
         
-
         # Desired acceleration for the QP - not calculating now and assuming sats take care of it
         
         #Don't ask questions move on with your life
@@ -144,7 +143,7 @@ class OSC(LeafSystem):
         ## Update the internal context ##
         self.plant.SetPositionsAndVelocities(self.plant_context, x)
 
-        fsm = self.EvalAbstractInput(context, self.phaseInput).get_value()
+        fsm = int(self.EvalAbstractInput(context, self.phaseInput).get_value().get_value()) - 1
 
         ## Create the Mathematical Program ##
         qp = MathematicalProgram()
@@ -156,7 +155,7 @@ class OSC(LeafSystem):
         whatToTrack = self.whatToTrack[fsm]
         for track in whatToTrack:
             #Get desired trajectory and costs
-            traj = self.EvalAbstractInput(x, self.traj_input_ports[fsm]).get_value()
+            traj = self.EvalAbstractInput(context, self.traj_input_ports[fsm]).get_value()
             cost = self.Costs[track]
             
             ## In Air Phase has foot trajectory to track

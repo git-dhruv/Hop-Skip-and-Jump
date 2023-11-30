@@ -27,18 +27,20 @@ class PhaseSwitch(LeafSystem):
         self.flightoutput_trajectory_port_index = self.DeclareAbstractOutputPort("OSCLFight_Trajectory", lambda: AbstractValue.Make(BasicVector(6)), self.SetFlightOutput).get_index()
         self.landingoutput_trajectory_port_index = self.DeclareAbstractOutputPort("OSCLanding_Trajectory", lambda: AbstractValue.Make(BasicVector(3)), self.SetLandingOutput).get_index()
         self.phaseoutput_port_index = self.DeclareAbstractOutputPort("Phase", lambda: AbstractValue.Make(BasicVector(1)), self.PhaseOutput).get_index()
+        self.robot_state_input_port_index = self.DeclareVectorInputPort("x", self.plant.num_positions() + self.plant.num_velocities()).get_index()
 
     def DeterminePhase(self, context):
         required_vel = (2*9.18*self.req_height)**0.5
-        self.plant_context = deepcopy(context)
+        stateVector = self.EvalVectorInput(context, self.robot_state_input_port_index).get_value()
+        self.plant.SetPositionsAndVelocities(self.plant_context, stateVector)
         statePacket = fetchStates(self.plant_context, self.plant)
-        t  = self.plant_context.get_time()
+        t  = context.get_time()
         phase = 0
         if phase == 0:
             phase = 1
-        if (t>1.1*self.jump_time or statePacket['com_vel'] > 0.97*required_vel) and statePacket['left_leg'] > 1e-2 and statePacket['right_leg'] > 1e-2:
+        if (t>1.1*self.jump_time or statePacket['com_vel'][-1] > 0.97*required_vel) and statePacket['left_leg'][-1] > 1e-2 and statePacket['right_leg'][-1] > 1e-2:
             phase = 2
-        if statePacket['com_vel'] < 0 and statePacket['left_leg'] < 1e-2 and statePacket["right_leg"] < 1e-2 and t>self.jump_time:
+        if statePacket['com_vel'][-1] < 0 and statePacket['left_leg'][-1] < 1e-2 and statePacket["right_leg"][-1] < 1e-2 and t>self.jump_time:
             phase = 3
         return phase
     
@@ -49,7 +51,6 @@ class PhaseSwitch(LeafSystem):
     
     def SetFlightOutput(self, x, output):
         phase = self.DeterminePhase(x)
-        np.array([com[0]+0.3, 0 , np.clip(com[-1]-0.6,0, np.inf)])
         if phase == 2:
             statePacket = fetchStates(self.plant_context, self.plant)
             com = statePacket['com_pos']
@@ -76,4 +77,5 @@ class PhaseSwitch(LeafSystem):
     def get_aerial_trajectory_port_index(self): return self.get_output_port(self.flightoutput_trajectory_port_index)
     def get_landing_trajectory_port_index(self): return self.get_output_port(self.landingoutput_trajectory_port_index)
     def get_phase_switch_output_port_index(self): return self.get_output_port(self.phaseoutput_port_index)
+    def get_state_input_port(self): return self.get_input_port(self.robot_state_input_port_index)
     
