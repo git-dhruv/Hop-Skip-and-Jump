@@ -6,6 +6,7 @@ from pydrake.trajectories import Trajectory, PiecewisePolynomial
 from pydrake.common.value import AbstractValue
 from pydrake.math import RigidTransform
 from pydrake.multibody.all import JacobianWrtVariable
+from copy import deepcopy
 
 
 class PhaseSwitch(LeafSystem):
@@ -27,8 +28,9 @@ class PhaseSwitch(LeafSystem):
         self.landingoutput_trajectory_port_index = self.DeclareAbstractOutputPort("OSCLanding_Trajectory", lambda: AbstractValue.Make(BasicVector(3)), self.SetLandingOutput).get_index()
         self.phaseoutput_port_index = self.DeclareAbstractOutputPort("Phase", lambda: AbstractValue.Make(BasicVector(1)), self.PhaseOutput).get_index()
 
-    def DeterminePhase(self):
+    def DeterminePhase(self, context):
         required_vel = (2*9.18*self.req_height)**0.5
+        self.plant_context = deepcopy(context)
         statePacket = fetchStates(self.plant_context, self.plant)
         t  = self.plant_context.get_time()
         phase = 0
@@ -40,13 +42,13 @@ class PhaseSwitch(LeafSystem):
             phase = 3
         return phase
     
-    def SetPreflightOutput(self, context, output):
-        phase = self.DeterminePhase()
+    def SetPreflightOutput(self, x, output):
+        phase = self.DeterminePhase(x)
         if phase == 1:
             output.set_value(self.x_traj)
     
-    def SetFlightOutput(self, context, output):
-        phase = self.DeterminePhase()
+    def SetFlightOutput(self, x, output):
+        phase = self.DeterminePhase(x)
         np.array([com[0]+0.3, 0 , np.clip(com[-1]-0.6,0, np.inf)])
         if phase == 2:
             statePacket = fetchStates(self.plant_context, self.plant)
@@ -59,15 +61,15 @@ class PhaseSwitch(LeafSystem):
             else:
                 output.set_value(BasicVector([com[0]-0.3, 0 , np.clip(com[-1]-0.6,0, np.inf), com[0]+0.3, 0 , np.clip(com[-1]-0.6,0, np.inf)]))
 
-    def SetLandingOutput(self, context, output):
-        phase = self.DeterminePhase()
+    def SetLandingOutput(self, x, output):
+        phase = self.DeterminePhase(x)
         if phase == 3:
             statePacket = fetchStates(self.plant_context, self.plant)
             com = statePacket['com_pos']
             output.set_value(BasicVector([com[0],0,float(self.z_des)]))
 
-    def PhaseOutput(self, output):
-        phase = self.DeterminePhase()
+    def PhaseOutput(self, x, output):
+        phase = self.DeterminePhase(x)
         output.set_value(BasicVector([phase]))
 
     def get_preflight_port_index(self): return self.get_output_port(self.preflightoutput_trajectory_port_index)

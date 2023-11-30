@@ -60,6 +60,7 @@ builder.Connect(PhaseSwitcher.get_aerial_trajectory_port_index(),OScontroller.ge
 builder.Connect(PhaseSwitcher.get_landing_trajectory_port_index(),OScontroller.get_landinginput_port_index())
 builder.Connect(PhaseSwitcher.get_phase_switch_output_port_index(),OScontroller.get_phase_port_index())
 builder.Connect(OScontroller.torque_output_port, plant.get_actuation_input_port())
+builder.Connect(plant.get_state_output_port(), OScontroller.get_state_input_port()) 
 
 #Builld
 vis_params = MeshcatVisualizerParams(publish_period=0.005)
@@ -77,6 +78,8 @@ with open('graph.svg', 'wb') as f:
 
 
 ### Go ###
+plant.SetPositions(plant_context, q)
+simulator.AdvanceTo(0.8)
 
 
 

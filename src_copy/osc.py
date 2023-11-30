@@ -21,6 +21,12 @@ from pydrake.common.value import AbstractValue
 from pydrake.math import RigidTransform
 from utils import calculateDoubleContactJacobians, fetchStates
 
+### FSM MODES ###
+PREFLIGHT = 0
+FLIGHT = 1
+LAND = 2
+
+
 class OSC(LeafSystem):
     def __init__(self, urdf, polyTraj=0):
         LeafSystem.__init__(self)
@@ -39,14 +45,14 @@ class OSC(LeafSystem):
 
 
         ## ___________Parameters for tracking___________ ##
-        self.whatToTrack = ['COM', 'torso', 'foot']
+        self.whatToTrack = [['COM', 'torso'],['foot'],['COM', 'torso']]
         
         COMParams = {'Kp': np.diag([60, 0, 60]), 'Kd': np.diag([100, 0, 100])/5 , 'saturations': 20} #Max Lim: 1 G
         TorsoParams = {'Kp': np.diag([50]), 'Kd': np.diag([2]) , 'saturations': 15*np.pi/180} #Max Lim: 5 deg/s
         footParams = {'Kp': 700*np.eye(3,3), 'Kd': 30*np.eye(3,3) , 'saturations': 50000} #Max Lim: 10 m/s2
         ## Cost Weights ##
         self.WCOM = np.eye(3,3)
-        self.WTorso = np.diag([0.1]) #Maybe a consistant way to set the weights - 5*np.pi/180*(self.WCOM.max()/10)
+        self.WTorso = np.diag([0.1]) 
         self.wFoot = np.array([[2,0,0],[0,2,0],[0,0,2]])
         self.Costs = {'COM': self.WCOM, 'torso' : self.WTorso, 'foot': self.wFoot} 
         ##_______________________________________________##
@@ -57,38 +63,26 @@ class OSC(LeafSystem):
 
 
         # !WARNING : IT IS ASSUMED THAT OSC AND OSC_TRACKING SHARE THE SAME PLANT!
-        self.tracking_objective_air = tracking_objective(self.plant, self.plant_context, None, None, footParams, polyTraj=polyTraj)
-        self.tracking_objective_land = tracking_objective(self.plant, self.plant_context, COMParams, TorsoParams, None, polyTraj=polyTraj)
+        self.tracking_objective_preflight = tracking_objective(self.plant, self.plant_context, COMParams, TorsoParams, None, polyTraj=1)
+        self.tracking_objective_air = tracking_objective(self.plant, self.plant_context, None, None, footParams, polyTraj=0)
+        self.tracking_objective_land = tracking_objective(self.plant, self.plant_context, COMParams, TorsoParams, None, polyTraj=0)
 
 
         ## ______________Declaring Ports______________ ##        
         self.robot_state_input_port_index = self.DeclareVectorInputPort("x", self.plant.num_positions() + self.plant.num_velocities()).get_index()
-        if polyTraj:
-            intype = [PiecewisePolynomial(),PiecewisePolynomial(), PiecewisePolynomial()]
-        else:
-            intype = [BasicVector(3),BasicVector(1), BasicVector(6)]
-        # self.traj_input_ports = {
-        #     self.whatToTrack[0]: self.DeclareAbstractInputPort("com_traj", AbstractValue.Make(intype[0])).get_index(),
-        #     self.whatToTrack[1]: self.DeclareAbstractInputPort("base_joint_traj", AbstractValue.Make(intype[1])).get_index(),
-        #     self.whatToTrack[2]: self.DeclareAbstractInputPort("foot_traj", AbstractValue.Make(intype[2])).get_index()}
-
-
         self.dircolInput = self.DeclareAbstractInputPort("preflight",AbstractValue.Make(PiecewisePolynomial())).get_index()
         self.flightInput = self.DeclareAbstractInputPort("flight", AbstractValue.Make(BasicVector(6))).get_index()
         self.landInput = self.DeclareAbstractInputPort("landing", AbstractValue.Make(BasicVector(3))).get_index()
-
-        self.phaseInput = self.DeclareAbstractInputPort("phase", AbstractValue.Make(BasicVector(1))).get_index()
-        
-        
+        self.phaseInput = self.DeclareAbstractInputPort("phase", AbstractValue.Make(BasicVector(1))).get_index()        
         self.torque_output_port = self.DeclareVectorOutputPort("u", self.plant.num_actuators(), self.CalcTorques)
         self.u = np.zeros((self.plant.num_actuators()))
-
         self.logging_port = self.DeclareVectorOutputPort("logs", BasicVector(30), self.logCB)
+
+        self.traj_input_ports = [self.dircolInput, self.flightInput, self.landInput]
+
         ##_______________________________________________##
 
         self.idx = None; self.inAir = 0; 
-    
-        self.whatToTrack = ['COM', 'torso']
 
 
     def fetchTrackParams(self):
@@ -150,17 +144,7 @@ class OSC(LeafSystem):
         ## Update the internal context ##
         self.plant.SetPositionsAndVelocities(self.plant_context, x)
 
-        stancefoot = fetchStates(self.plant_context, self.plant)
-        
-        if stancefoot['left_leg'][-1]>=1e-2 and stancefoot['right_leg'][-1]>=1e-2:
-            self.inAir = 1
-            self.previnAir = t
-            
-        else:
-            self.inAir = 0
-
-        self.inAir = 0
-
+        fsm = self.EvalAbstractInput(context, self.phaseInput).get_value()
 
         ## Create the Mathematical Program ##
         qp = MathematicalProgram()
@@ -169,20 +153,21 @@ class OSC(LeafSystem):
         lambda_c = qp.NewContinuousVariables(6, "lambda_c")
 
         ## Quadratic Costs ##
-        for track in self.whatToTrack:
+        whatToTrack = self.whatToTrack[fsm]
+        for track in whatToTrack:
             #Get desired trajectory and costs
-            traj = self.EvalAbstractInput(context, self.traj_input_ports[track]).get_value()
+            traj = self.EvalAbstractInput(x, self.traj_input_ports[fsm]).get_value()
             cost = self.Costs[track]
-
-            if self.inAir and 'foot' in track:
-                for fsm in [0, 1]:
+            
+            ## In Air Phase has foot trajectory to track
+            if 'foot' in track:
+                for footNum in [0, 1]:
                     # Get what to track and system states
-                    yddot_cmd_i, J_i, JdotV_i = self.tracking_objective_air.Update(t, traj, track, fsm)
+                    yddot_cmd_i, J_i, JdotV_i = self.tracking_objective_air.Update(t, traj, track, footNum)
                     yii = JdotV_i + J_i@vdot
                     qp.AddQuadraticCost( (yddot_cmd_i - yii).T@cost@(yddot_cmd_i - yii) )
-
-            elif ('foot' not in track) and (self.inAir==0):
-                #Get what to track and system states
+            ## Preflight and Land phase has other things to track
+            else:
                 yddot_cmd_i, J_i, JdotV_i = self.tracking_objective_land.Update(t, traj, track)    
                 yii = JdotV_i + J_i@vdot
                 qp.AddQuadraticCost( (yddot_cmd_i - yii).T@cost@(yddot_cmd_i - yii) )
