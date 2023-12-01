@@ -173,7 +173,7 @@ def find_throwing_trajectory(N, initial_state, jumpheight, tf, jumpheight_tol=5e
   prog.SetInitialGuess(lambda_c_col, lambda_c_col_init)
 
   print("Starting the solve")
-  prog.SetSolverOption(SolverType.kSnopt, "Major iterations limit", 1) #30000
+  prog.SetSolverOption(SolverType.kSnopt, "Major iterations limit", 30000) #30000
   # Set up solver
   result = Solve(prog)
   
