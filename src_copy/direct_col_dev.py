@@ -1,5 +1,5 @@
 import matplotlib.pyplot as plt
-import numpy as np
+import numpy as np, os
 import importlib
 from pydrake.all import (DiagramBuilder, Simulator, FindResourceOrThrow, MultibodyPlant, PiecewisePolynomial, SceneGraph,
     Parser, JointActuatorIndex, MathematicalProgram, Solve, SolverType)
@@ -8,7 +8,8 @@ from pydrake.math import RigidTransform
 
 from dynamics_constraints_dev import (
   AddCollocationConstraints,
-  EvaluateDynamics
+  EvaluateDynamics, 
+  AddAngularMomentumConstraint,
 )
 
 from dataclasses import dataclass
@@ -51,7 +52,11 @@ def find_throwing_trajectory(N, initial_state, jumpheight, tf, jumpheight_tol=5e
 
   builder = DiagramBuilder()
   plant = builder.AddSystem(MultibodyPlant(0.0))
-  file_name = "/home/dhruv/Hop-Skip-and-Jump/models/planar_walker.urdf" #"/home/anirudhkailaje/Documents/01_UPenn/02_MEAM5170/03_FinalProject/models/planar_walker.urdf"
+  for root, dirs, files in os.walk('../'):
+      for file in files:
+          if "planar_walker.urdf" in file:
+            file_name = os.path.join(root, file)
+  # file_name = "/home/dhruv/Hop-Skip-and-Jump/models/planar_walker.urdf" #"/home/anirudhkailaje/Documents/01_UPenn/02_MEAM5170/03_FinalProject/models/planar_walker.urdf"
   Parser(plant=plant).AddModels(file_name)
   plant.WeldFrames(plant.world_frame(),plant.GetBodyByName("base").body_frame(),RigidTransform.Identity())
   plant.Finalize()
@@ -121,7 +126,9 @@ def find_throwing_trajectory(N, initial_state, jumpheight, tf, jumpheight_tol=5e
        prog.AddLinearConstraint(x[i][2], -1e-4, 1e-4)
        
        if i>=N-3:
-        prog.AddLinearConstraint(x[i+1][n_q+1] - x[i][n_q+1] , -9, 30)        
+        prog.AddLinearConstraint(x[i+1][n_q+1] - x[i][n_q+1] , -9, 30)
+        ##Adding costs for angular momentum
+        AddAngularMomentumConstraint(prog, robot, context, x[i], 1)
        else:
         prog.AddLinearConstraint(x[i+1][n_q+1] - x[i][n_q+1], -20, 9)
         prog.AddLinearConstraint(x[i][n_q] - x[i+1][n_q], -.01, .01)        
