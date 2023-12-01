@@ -111,6 +111,7 @@ class fetchCOMParams:
 
         self.getVal = valueFetcher(polyTraj)
 
+        
         self.desiredPos = np.zeros((params['Kp'].shape[0],)); self.desiredVel = np.zeros((params['Kp'].shape[0],))
 
     def getAcc(self, ydes, t, finiteState):
@@ -145,19 +146,8 @@ class fetchCOMParams:
     def CalcJdotV(self) -> np.ndarray:
         return self.plant.CalcBiasCenterOfMassTranslationalAcceleration(self.context, JacobianWrtVariable.kV, self.plant.world_frame(), self.plant.world_frame()).ravel()
     
-    def convertStateToCOM(self, state):
-        ## Replace this with deep copy of plant ##
-        
+    def convertStateToCOM(self, state):        
         plant = deepcopy(self.plant)
-        # plant = MultibodyPlant(0.0)
-        # parser = Parser(plant)
-        # parser.AddModels("../models/planar_walker.urdf")
-        # plant.WeldFrames(
-        #     plant.world_frame(),
-        #     plant.GetBodyByName("base").body_frame(),
-        #     RigidTransform.Identity()
-        # )
-        # plant.Finalize()
         context = plant.CreateDefaultContext()        
         #Get the internal robot to go to current state
         plant.SetPositionsAndVelocities(context, state)
@@ -205,24 +195,21 @@ class fetchFootParams:
 
         self.getVal = valueFetcher(polyTraj)
 
-        self.desiredPos = np.zeros((params['Kp'].shape[0],)); self.desiredVel = np.zeros((params['Kp'].shape[0],))
+        #Kp is 3x3 since both foot have the same gains for enforcing symmetry. Hence we multiply by 2
+
+        self.desiredPos = np.zeros((2*params['Kp'].shape[0],)); self.desiredVel = np.zeros((2*params['Kp'].shape[0],))
 
     def getAcc(self, ydes, t, fsm):
         self.fsm = fsm
         y = self.CalcY()
         ydot = self.CalcYdot()    
         yd = self.getVal.getVal(ydes, t)    
-        # com = fetchStates(self.context, self.plant )['com_pos']
-        # if fsm:
-        #     target = np.array([com[0]+0.3, 0 , np.clip(com[-1]-0.6,0, np.inf)])
-        # else:
-        #     target = np.array([com[0]-0.3, 0 , np.clip(com[-1]-0.6,0, np.inf)])
         if fsm:
             target = yd[:3]
         else:
             target = yd[3:]
 
-        self.desiredPos = target; self.desiredVel = target*0
+        self.desiredPos = yd; self.desiredVel = yd*0
         return self.pid.calcOut(y, target, ydot, y*0)
 
 
