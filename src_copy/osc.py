@@ -78,7 +78,7 @@ class OSC(LeafSystem):
         self.phaseInput = self.DeclareAbstractInputPort("phase", AbstractValue.Make(BasicVector(1))).get_index()        
         self.torque_output_port = self.DeclareVectorOutputPort("u", self.plant.num_actuators(), self.CalcTorques)
         self.u = np.zeros((self.plant.num_actuators()))
-        self.logging_port = self.DeclareVectorOutputPort("logs", BasicVector(35), self.logCB)
+        self.logging_port = self.DeclareVectorOutputPort("logs", BasicVector(40), self.logCB)
 
         self.traj_input_ports = [self.dircolInput, self.flightInput, self.landInput]
 
@@ -86,6 +86,9 @@ class OSC(LeafSystem):
 
         self.idx = None; self.inAir = 0;
         self.fsm = PREFLIGHT 
+
+        self.usol = np.zeros((self.plant.num_actuators()))
+        self.solutionCost = 0
 
     def fetchTrackParams(self):
         ##@TODO: Take FSM as a Class parameter and record the particular objective. Also record the FSM 
@@ -141,8 +144,12 @@ class OSC(LeafSystem):
         Torso_VEL_DESIRED = x[i[11]:i[12],:]
         LFt_POS_DESIRED = x[i[12]:i[13],:]
         RFt_POS_DESIRED = x[i[13]:i[14],:]
-        FSM = x[i[14]:,:]
-        return COM_POS, COM_VEL, T_POS, T_VEL, LEFT_FOOT, RIGHT_FOOT, COM_POS_DESIRED, COM_VEL_DESIRED, Torso_POS_DESIRED, Torso_VEL_DESIRED, LFt_POS_DESIRED, RFt_POS_DESIRED, FSM
+        FSM = x[i[14]:i[15],:]
+
+        Torques = x[i[15]:i[16],:]
+        Cost = x[i[16]:,:]
+
+        return COM_POS, COM_VEL, T_POS, T_VEL, LEFT_FOOT, RIGHT_FOOT, COM_POS_DESIRED, COM_VEL_DESIRED, Torso_POS_DESIRED, Torso_VEL_DESIRED, LFt_POS_DESIRED, RFt_POS_DESIRED, FSM, Torques, Cost
         
     def logCB(self, context, output):
         # COM, Torso Angle, Foot pos and velocities
@@ -163,7 +170,15 @@ class OSC(LeafSystem):
         for _, value in trackPacket.items():
             outVector = np.concatenate((outVector, value.flatten()))
             idx.append(outVector.shape[0])
+
+        ## Torque Outputs ##        
+        outVector = np.concatenate((outVector, self.usol.flatten()))
+        idx.append(outVector.shape[0])
+        ## Costs ##
+        outVector = np.concatenate((outVector, np.diag([self.solutionCost]).flatten()))
+        idx.append(outVector.shape[0])
         
+
         self.log_idx = idx
         output.SetFromVector(outVector)        
 
@@ -255,7 +270,7 @@ class OSC(LeafSystem):
             qp.AddLinearEqualityConstraint(M@vdot + Cv + G - B@u, np.zeros((7,)))
 
         for i in range(len(u)):
-            qp.AddLinearConstraint(u[i], np.array([-1400]), np.array([1400]))
+            qp.AddLinearConstraint(u[i], np.array([-1000]), np.array([1000]))
 
         # Solve the QP
         solver = OsqpSolver()
@@ -265,14 +280,16 @@ class OSC(LeafSystem):
 
         result = solver.Solve(qp)
 
+        self.solutionCost = result.get_optimal_cost()
+
         # If we exceed iteration limits use the previous solution
         if not result.is_success():            
             print("Solver not working, pal!!!  ", t)
-            usol = self.u/10
+            usol = self.usol
         else:
             usol = result.GetSolution(u)                    
-        if  np.linalg.norm(usol)>1400:
-            usol = 1400*usol/np.linalg.norm(usol)
+        if  np.linalg.norm(usol)>1000:
+            usol = 1000*usol/np.linalg.norm(usol)
         return usol
 
     ## Ignore ##
