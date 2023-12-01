@@ -50,17 +50,17 @@ class OSC(LeafSystem):
         COMParams = {'Kp': np.diag([60, 0, 60]), 'Kd': 0*np.diag([100, 0, 100])/25 , 'saturations': 50} #Max Lim: 1 G
         COMParams_land = {'Kp': np.diag([600, 0, 600]), 'Kd': np.diag([100, 0, 100]) , 'saturations': 50} #Max Lim: 1 G
         TorsoParams = {'Kp': np.diag([0]), 'Kd': np.diag([2]) , 'saturations': 50} #Max Lim: 5 deg/s2
-        TorsoParams_land = {'Kp': np.diag([3.5]), 'Kd': np.diag([1.5]) , 'saturations': 50} #Max Lim: 5 deg/s2
+        TorsoParams_land = {'Kp': np.diag([5.85]), 'Kd': np.diag([2.85]) , 'saturations': 50} #Max Lim: 5 deg/s2
         footParams = {'Kp': 700*np.eye(3,3), 'Kd': 30*np.eye(3,3) , 'saturations': 5e5} #Max Lim: 10 m/s2
         ## Cost Weights ##
         self.WCOM = np.eye(3,3)
-        self.WTorso = np.diag([10]) 
+        self.WTorso = np.diag([40]) 
         self.wFoot = np.array([[2,0,0],[0,2,0],[0,0,2]])
         self.Costs = {'COM': self.WCOM, 'torso' : self.WTorso, 'foot': self.wFoot} 
         ##_______________________________________________##
 
         ## ______________Solver Parameters______________ ##
-        self.max_iter = 30000
+        self.max_iter = 10000
         ##_______________________________________________##
 
 
