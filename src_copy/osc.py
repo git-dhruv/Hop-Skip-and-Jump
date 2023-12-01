@@ -47,7 +47,7 @@ class OSC(LeafSystem):
         ## ___________Parameters for tracking___________ ##
         self.whatToTrack = [['COM', 'torso'],['foot', 'torso'],['COM', 'torso']]
         
-        COMParams = {'Kp': np.diag([60, 0, 60]), 'Kd': np.diag([100, 0, 100])/25 , 'saturations': 50} #Max Lim: 1 G
+        COMParams = {'Kp': np.diag([60, 0, 60]), 'Kd': 0*np.diag([100, 0, 100])/25 , 'saturations': 50} #Max Lim: 1 G
         COMParams_land = {'Kp': np.diag([600, 0, 600]), 'Kd': np.diag([100, 0, 100]) , 'saturations': 50} #Max Lim: 1 G
         TorsoParams = {'Kp': np.diag([5]), 'Kd': np.diag([2]) , 'saturations': 50*np.pi/180} #Max Lim: 5 deg/s2
         footParams = {'Kp': 700*np.eye(3,3), 'Kd': 30*np.eye(3,3) , 'saturations': 50000} #Max Lim: 10 m/s2
@@ -87,7 +87,7 @@ class OSC(LeafSystem):
 
 
     def fetchTrackParams(self):
-        return {'COM_pos_d': self.tracking_objective_land.COMTracker.desiredPos, 'COM_vel_d':self.tracking_objective_land.COMTracker.desiredVel,
+        return {'COM_pos_d': self.tracking_objective_preflight.COMTracker.desiredPos, 'COM_vel_d':self.tracking_objective_land.COMTracker.desiredVel,
                'Torso_pos_d': self.tracking_objective_land.TorsoTracker.desiredPos, 'Torso_vel_d':self.tracking_objective_land.TorsoTracker.desiredVel,
                'Foot_pos_d': np.array([0]), 'Foot_vel_d': np.array([0])}
                 

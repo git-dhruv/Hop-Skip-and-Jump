@@ -125,8 +125,6 @@ class fetchCOMParams:
             ## Yes these are state accelerations but we approximate base frame as COM
             acc = ydes.derivative(2).value(t).ravel()
             yd_ddotdes = np.array([0, 0, acc[1]]) 
-            if t>0.2:
-                yd_ddotdes = np.array([0, 0, 9.81])
             
         y = self.CalcY()
         ydot = self.CalcYdot()    
