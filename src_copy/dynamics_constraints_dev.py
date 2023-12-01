@@ -231,3 +231,13 @@ def AddCollocationConstraints(prog, planar_arm, context, N, x, u, lambda_c, lamb
     prog.AddConstraint(CollocationConstraintHelper_3, np.zeros(12), np.zeros(12),np.hstack([x[i], x[i+1], u[i], u[i+1], lambda_c[i], lambda_c[i+1], lambda_c_col[i], gamma[i], gamma[i+1], gamma_col[i]]))
     prog.AddConstraint(CollocationConstraintHelper_4, np.zeros((20,1)), np.zeros((20,1)),np.hstack([x[i], x[i+1], u[i], u[i+1], lambda_c[i], lambda_c[i+1], lambda_c_col[i], gamma[i], gamma[i+1], gamma_col[i]]))
 
+def AddAngularMomentumConstraint(prog, robot, context, x, Lthd):
+
+  def AngularMomentumHelper(vars):
+    x = vars
+    base_point = robot.CalcPointsPositions(context, robot.GetFrameByName("base"), np.array([0,0,0]), robot.world_frame())
+    L = robot.CalcSpatialMomentumInWorldAboutPoint(context, base_point).rotational().ravel()
+    return L
+
+  prog.AddConstraint(AngularMomentumHelper, np.zeros(3)-Lthd/2, np.zeros(3)+Lthd/2, x)  
+  
