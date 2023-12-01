@@ -50,7 +50,7 @@ class OSC(LeafSystem):
         COMParams = {'Kp': np.diag([60, 0, 60]), 'Kd': 0*np.diag([100, 0, 100])/25 , 'saturations': 50} #Max Lim: 1 G
         COMParams_land = {'Kp': np.diag([600, 0, 600]), 'Kd': np.diag([100, 0, 100]) , 'saturations': 50} #Max Lim: 1 G
         TorsoParams = {'Kp': np.diag([0]), 'Kd': np.diag([2]) , 'saturations': 50} #Max Lim: 5 deg/s2
-        TorsoParams_land = {'Kp': np.diag([1]), 'Kd': np.diag([2]) , 'saturations': 50} #Max Lim: 5 deg/s2
+        TorsoParams_land = {'Kp': np.diag([3.5]), 'Kd': np.diag([1.5]) , 'saturations': 50} #Max Lim: 5 deg/s2
         footParams = {'Kp': 700*np.eye(3,3), 'Kd': 30*np.eye(3,3) , 'saturations': 5e5} #Max Lim: 10 m/s2
         ## Cost Weights ##
         self.WCOM = np.eye(3,3)
@@ -78,35 +78,45 @@ class OSC(LeafSystem):
         self.phaseInput = self.DeclareAbstractInputPort("phase", AbstractValue.Make(BasicVector(1))).get_index()        
         self.torque_output_port = self.DeclareVectorOutputPort("u", self.plant.num_actuators(), self.CalcTorques)
         self.u = np.zeros((self.plant.num_actuators()))
-        self.logging_port = self.DeclareVectorOutputPort("logs", BasicVector(30), self.logCB)
+        self.logging_port = self.DeclareVectorOutputPort("logs", BasicVector(35), self.logCB)
 
         self.traj_input_ports = [self.dircolInput, self.flightInput, self.landInput]
 
         ##_______________________________________________##
 
-        self.idx = None; self.inAir = 0; 
-
+        self.idx = None; self.inAir = 0;
+        self.fsm = PREFLIGHT 
 
     def fetchTrackParams(self):
+        ##@TODO: Take FSM as a Class parameter and record the particular objective. Also record the FSM 
         return {'COM_pos_d': self.tracking_objective_preflight.COMTracker.desiredPos, 'COM_vel_d':self.tracking_objective_land.COMTracker.desiredVel,
                'Torso_pos_d': self.tracking_objective_land.TorsoTracker.desiredPos, 'Torso_vel_d':self.tracking_objective_land.TorsoTracker.desiredVel,
-               'Foot_pos_d': np.array([0]), 'Foot_vel_d': np.array([0])}
+               'LFoot_pos_d': self.tracking_objective_air.FootTracker.desiredPos[:3], 'RFoot_vel_d': self.tracking_objective_air.FootTracker.desiredPos[3:],
+               'FSM': np.diag([self.fsm])}
                 
     def logParse(self, x):
         #Parses the log data and returns in human readable form - test in ipynb
         i = self.log_idx
+
+        ## State Vectors ##
         COM_POS = x[:i[1],:]
         COM_VEL = x[i[1]:i[2],:]
         T_POS = x[i[2]:i[3],:]
         T_VEL = x[i[3]:i[4],:]
-        left = x[i[4]:i[5],:]
-        right = x[i[5]:i[6],:]
+        LEFT_FOOT = x[i[4]:i[5],:]
+        RIGHT_FOOT = x[i[5]:i[6],:]
+        LEFT_FOOT_VEL = x[i[6]:i[7],:]
+        RIGHT_FOOT_VEL = x[i[7]:i[8],:]
+
+        ## Targets ##
         COM_POS_DESIRED = x[i[8]:i[9],:]
         COM_VEL_DESIRED = x[i[9]:i[10],:]
         Torso_POS_DESIRED = x[i[10]:i[11],:]
         Torso_VEL_DESIRED = x[i[11]:i[12],:]
-        Ft_POS_DESIRED = x[i[13]:i[14],:]
-        return COM_POS, COM_VEL, T_POS, T_VEL, left, right, COM_POS_DESIRED, COM_VEL_DESIRED, Torso_POS_DESIRED, Torso_VEL_DESIRED, Ft_POS_DESIRED, Ft_POS_DESIRED
+        LFt_POS_DESIRED = x[i[13]:i[14],:]
+        RFt_POS_DESIRED = x[i[14]:i[15],:]
+        FSM = x[i[15]:,:]
+        return COM_POS, COM_VEL, T_POS, T_VEL, LEFT_FOOT, RIGHT_FOOT, COM_POS_DESIRED, COM_VEL_DESIRED, Torso_POS_DESIRED, Torso_VEL_DESIRED, LFt_POS_DESIRED, RFt_POS_DESIRED, FSM
         
     def logCB(self, context, output):
         # COM, Torso Angle, Foot pos and velocities
@@ -131,7 +141,6 @@ class OSC(LeafSystem):
             idx.append(outVector.shape[0])
         
         self.log_idx = idx
-        self.acc = 0
         output.SetFromVector(outVector)        
 
         
@@ -144,7 +153,7 @@ class OSC(LeafSystem):
         ## Update the internal context ##
         self.plant.SetPositionsAndVelocities(self.plant_context, x)
 
-        fsm = int(self.EvalAbstractInput(context, self.phaseInput).get_value().get_value()) - 1
+        self.fsm = int(self.EvalAbstractInput(context, self.phaseInput).get_value().get_value()) - 1
 
 
         ## Create the Mathematical Program ##
@@ -154,20 +163,20 @@ class OSC(LeafSystem):
         lambda_c = qp.NewContinuousVariables(6, "lambda_c")
 
         ## Quadratic Costs ##
-        whatToTrack = self.whatToTrack[fsm]
+        whatToTrack = self.whatToTrack[self.fsm]
         for track in whatToTrack:
             #Get desired trajectory and costs
             if 'torso' in track:
-                if fsm == PREFLIGHT:
+                if self.fsm == PREFLIGHT:
                     traj = PiecewisePolynomial(np.zeros(1,))
                 else:
                     traj = BasicVector(np.zeros(1,))
             else:
-                traj = self.EvalAbstractInput(context, self.traj_input_ports[fsm]).get_value()
+                traj = self.EvalAbstractInput(context, self.traj_input_ports[self.fsm]).get_value()
             cost = self.Costs[track]
             
             ## In Air Phase has foot trajectory to track
-            if fsm==FLIGHT:
+            if self.fsm==FLIGHT:
                 qp.AddQuadraticCost( 1e-3*u.T@u )
                 if 'foot' in track:
                     for footNum in [0, 1]:
@@ -181,12 +190,12 @@ class OSC(LeafSystem):
                     qp.AddQuadraticCost( (yddot_cmd_i - yii).T@cost@(yddot_cmd_i - yii) )
                         
             ## Preflight and Land phase has other things to track
-            if fsm==PREFLIGHT:
-                yddot_cmd_i, J_i, JdotV_i = self.tracking_objective_preflight.Update(t, traj, track, finiteState=fsm)    
+            if self.fsm==PREFLIGHT:
+                yddot_cmd_i, J_i, JdotV_i = self.tracking_objective_preflight.Update(t, traj, track, finiteState=self.fsm)    
                 yii = JdotV_i + J_i@vdot
                 qp.AddQuadraticCost( (yddot_cmd_i - yii).T@cost@(yddot_cmd_i - yii) )                
-            if fsm==LAND:
-                yddot_cmd_i, J_i, JdotV_i = self.tracking_objective_land.Update(t, traj, track, finiteState=fsm)    
+            if self.fsm==LAND:
+                yddot_cmd_i, J_i, JdotV_i = self.tracking_objective_land.Update(t, traj, track, finiteState=self.fsm)    
                 yii = JdotV_i + J_i@vdot
                 qp.AddQuadraticCost( (yddot_cmd_i - yii).T@cost@(yddot_cmd_i - yii) )
 
@@ -203,7 +212,7 @@ class OSC(LeafSystem):
         B = self.plant.MakeActuationMatrix()
 
         #Calculate Contact Jacobians
-        if fsm != FLIGHT:
+        if self.fsm != FLIGHT:
             J_c, J_c_dot_v = calculateDoubleContactJacobians(self.plant, self.plant_context)
             #Dynamics
             qp.AddLinearEqualityConstraint(M@vdot + Cv + G - B@u - J_c.T@lambda_c, np.zeros((7,)))
