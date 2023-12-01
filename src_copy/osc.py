@@ -51,7 +51,7 @@ class OSC(LeafSystem):
         COMParams_land = {'Kp': np.diag([600, 0, 600]), 'Kd': np.diag([100, 0, 100]) , 'saturations': 50} #Max Lim: 1 G
         TorsoParams = {'Kp': np.diag([0]), 'Kd': np.diag([2]) , 'saturations': 50} #Max Lim: 5 deg/s2
         TorsoParams_land = {'Kp': np.diag([5.85]), 'Kd': np.diag([2.85]) , 'saturations': 50} #Max Lim: 5 deg/s2
-        footParams = {'Kp': 700*np.eye(3,3), 'Kd': 30*np.eye(3,3) , 'saturations': 5e5} #Max Lim: 10 m/s2
+        footParams = {'Kp': 170*np.eye(3,3), 'Kd': 30*np.eye(3,3) , 'saturations': 5e5} #Max Lim: 10 m/s2
         ## Cost Weights ##
         self.WCOM = np.eye(3,3)
         self.WTorso = np.diag([40]) 
@@ -223,10 +223,8 @@ class OSC(LeafSystem):
                 yii = JdotV_i + J_i@vdot
                 qp.AddQuadraticCost( (yddot_cmd_i - yii).T@cost@(yddot_cmd_i - yii) )
 
-
-
-        # 
-        # qp.AddQuadraticCost(1e-1*(self.u-u).T@(self.u-u) )
+        # qp.AddQuadraticCost(1e-1*(self.u-u).T@(self.u-u) ) (np.random.random(self.plant.CalcMassMatrix(self.plant_context).shape) - 0.5)
+        Perturbation_Scale = 0.5
         # Calculate terms in the manipulator equation
         M = self.plant.CalcMassMatrix(self.plant_context)
         Cv = self.plant.CalcBiasTerm(self.plant_context)    
@@ -272,9 +270,7 @@ class OSC(LeafSystem):
             print("Solver not working, pal!!!  ", t)
             usol = self.u/10
         else:
-            usol = result.GetSolution(u)
-            self.acc = result.GetSolution(vdot)
-            self.u = usol        
+            usol = result.GetSolution(u)                    
         if  np.linalg.norm(usol)>1400:
             usol = 1400*usol/np.linalg.norm(usol)
         return usol
