@@ -51,7 +51,7 @@ def find_throwing_trajectory(N, initial_state, jumpheight, tf, jumpheight_tol=5e
 
   builder = DiagramBuilder()
   plant = builder.AddSystem(MultibodyPlant(0.0))
-  file_name = "/home/dhruv/Hop-Skip-and-Jump/models/planar_walker.urdf"
+  file_name = "/home/anirudhkailaje/Documents/01_UPenn/02_MEAM5170/03_FinalProject/models/planar_walker.urdf"
   Parser(plant=plant).AddModels(file_name)
   plant.WeldFrames(plant.world_frame(),plant.GetBodyByName("base").body_frame(),RigidTransform.Identity())
   plant.Finalize()
@@ -162,8 +162,8 @@ def find_throwing_trajectory(N, initial_state, jumpheight, tf, jumpheight_tol=5e
   # x_guess = np.load("/home/anirudhkailaje/Documents/01_UPenn/02_MEAM5170/03_FinalProject/src/traj.npy")
   # x_init = x_guess[:, ::(x_guess.shape[1])//N][:,:N].T
 
-  x_init = np.load('/home/dhruv/Hop-Skip-and-Jump/src/10NX.npy')#np.linspace(initial_state, initial_state, N)
-  u_init = np.load('/home/dhruv/Hop-Skip-and-Jump/src/10NU.npy') #np.random.uniform(low = -effort_limits, high = effort_limits, size=(N, n_u))/1e1
+  # x_init = np.load('/home/dhruv/Hop-Skip-and-Jump/src/10NX.npy')#np.linspace(initial_state, initial_state, N)
+  # u_init = np.load('/home/dhruv/Hop-Skip-and-Jump/src/10NU.npy') #np.random.uniform(low = -effort_limits, high = effort_limits, size=(N, n_u))/1e1
   lambda_init = np.zeros((N, 8))
   lambda_c_col_init = np.zeros((N-1, 8))
   

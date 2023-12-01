@@ -22,6 +22,7 @@ class PhaseSwitch(LeafSystem):
         self.x_traj = x_traj
         self.z_des = z_des
         self.plant_context = self.plant.CreateDefaultContext()
+        self.phase = None
 
         self.preflightoutput_trajectory_port_index = self.DeclareAbstractOutputPort("OSCPreflight_Trajectory", lambda: AbstractValue.Make(PiecewisePolynomial()), self.SetPreflightOutput).get_index()
         self.flightoutput_trajectory_port_index = self.DeclareAbstractOutputPort("OSCLFight_Trajectory", lambda: AbstractValue.Make(BasicVector(6)), self.SetFlightOutput).get_index()
@@ -36,13 +37,16 @@ class PhaseSwitch(LeafSystem):
         statePacket = fetchStates(self.plant_context, self.plant)
         t  = context.get_time()
         phase = 0
-        if phase == 0:
+        if phase == 0 and self.phase is None:
             phase = 1
+            self.phase = phase
         if (t>1.1*self.jump_time or statePacket['com_vel'][-1] > required_vel) and statePacket['left_leg'][-1] > 1e-2 and statePacket['right_leg'][-1] > 1e-2:
             phase = 2
+            self.phase = phase
         if  statePacket['left_leg'][-1] < 1e-2 and statePacket["right_leg"][-1] < 1e-2 and t>1.5*self.jump_time:
             phase = 3
-        return phase
+            self.phase = phase
+        return self.phase
     
     def SetPreflightOutput(self, x, output):
         phase = self.DeterminePhase(x)
