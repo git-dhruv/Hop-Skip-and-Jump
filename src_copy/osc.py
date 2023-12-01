@@ -113,9 +113,9 @@ class OSC(LeafSystem):
         COM_VEL_DESIRED = x[i[9]:i[10],:]
         Torso_POS_DESIRED = x[i[10]:i[11],:]
         Torso_VEL_DESIRED = x[i[11]:i[12],:]
-        LFt_POS_DESIRED = x[i[13]:i[14],:]
-        RFt_POS_DESIRED = x[i[14]:i[15],:]
-        FSM = x[i[15]:,:]
+        LFt_POS_DESIRED = x[i[12]:i[13],:]
+        RFt_POS_DESIRED = x[i[13]:i[14],:]
+        FSM = x[i[14]:,:]
         return COM_POS, COM_VEL, T_POS, T_VEL, LEFT_FOOT, RIGHT_FOOT, COM_POS_DESIRED, COM_VEL_DESIRED, Torso_POS_DESIRED, Torso_VEL_DESIRED, LFt_POS_DESIRED, RFt_POS_DESIRED, FSM
         
     def logCB(self, context, output):
@@ -124,9 +124,7 @@ class OSC(LeafSystem):
 
         # Desired COM, Torso, Desired Foot angles
         trackPacket = self.fetchTrackParams()
-        
-        # Desired acceleration for the QP - not calculating now and assuming sats take care of it
-        
+                
         #Don't ask questions move on with your life
         idx = [0]; outVector = None
         for _, value in statePacket.items():
