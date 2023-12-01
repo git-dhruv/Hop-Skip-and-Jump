@@ -45,12 +45,13 @@ class OSC(LeafSystem):
 
 
         ## ___________Parameters for tracking___________ ##
-        self.whatToTrack = [['COM', 'torso'],['foot', 'torso'],['COM', 'torso']]
+        self.whatToTrack = [['COM', 'torso'],['foot'],['COM', 'torso']]
         
         COMParams = {'Kp': np.diag([60, 0, 60]), 'Kd': 0*np.diag([100, 0, 100])/25 , 'saturations': 50} #Max Lim: 1 G
         COMParams_land = {'Kp': np.diag([600, 0, 600]), 'Kd': np.diag([100, 0, 100]) , 'saturations': 50} #Max Lim: 1 G
-        TorsoParams = {'Kp': np.diag([1]), 'Kd': np.diag([2]) , 'saturations': 50} #Max Lim: 5 deg/s2
-        footParams = {'Kp': 700*np.eye(3,3), 'Kd': 30*np.eye(3,3) , 'saturations': 50000} #Max Lim: 10 m/s2
+        TorsoParams = {'Kp': np.diag([0]), 'Kd': np.diag([2]) , 'saturations': 50} #Max Lim: 5 deg/s2
+        TorsoParams_land = {'Kp': np.diag([1]), 'Kd': np.diag([2]) , 'saturations': 50} #Max Lim: 5 deg/s2
+        footParams = {'Kp': 700*np.eye(3,3), 'Kd': 30*np.eye(3,3) , 'saturations': 5e5} #Max Lim: 10 m/s2
         ## Cost Weights ##
         self.WCOM = np.eye(3,3)
         self.WTorso = np.diag([10]) 
@@ -66,7 +67,7 @@ class OSC(LeafSystem):
         # !WARNING : IT IS ASSUMED THAT OSC AND OSC_TRACKING SHARE THE SAME PLANT!
         self.tracking_objective_preflight = tracking_objective(self.plant, self.plant_context, COMParams, TorsoParams, None, polyTraj=1)
         self.tracking_objective_air = tracking_objective(self.plant, self.plant_context, None, TorsoParams, footParams, polyTraj=0)
-        self.tracking_objective_land = tracking_objective(self.plant, self.plant_context, COMParams_land, TorsoParams, None, polyTraj=0)
+        self.tracking_objective_land = tracking_objective(self.plant, self.plant_context, COMParams_land, TorsoParams_land, None, polyTraj=0)
 
 
         ## ______________Declaring Ports______________ ##        
@@ -167,6 +168,7 @@ class OSC(LeafSystem):
             
             ## In Air Phase has foot trajectory to track
             if fsm==FLIGHT:
+                qp.AddQuadraticCost( 1e-1*u.T@u )
                 if 'foot' in track:
                     for footNum in [0, 1]:
                         # Get what to track and system states
@@ -182,7 +184,7 @@ class OSC(LeafSystem):
             if fsm==PREFLIGHT:
                 yddot_cmd_i, J_i, JdotV_i = self.tracking_objective_preflight.Update(t, traj, track, finiteState=fsm)    
                 yii = JdotV_i + J_i@vdot
-                qp.AddQuadraticCost( (yddot_cmd_i - yii).T@cost@(yddot_cmd_i - yii) )
+                qp.AddQuadraticCost( (yddot_cmd_i - yii).T@cost@(yddot_cmd_i - yii) )                
             if fsm==LAND:
                 yddot_cmd_i, J_i, JdotV_i = self.tracking_objective_land.Update(t, traj, track, finiteState=fsm)    
                 yii = JdotV_i + J_i@vdot
@@ -190,8 +192,8 @@ class OSC(LeafSystem):
 
 
 
-        # qp.AddQuadraticCost( 1e-7*u.T@u )
-        qp.AddQuadraticCost(0.01*(self.u-u).T@(self.u-u) )
+        # 
+        # qp.AddQuadraticCost(1e-1*(self.u-u).T@(self.u-u) )
         # Calculate terms in the manipulator equation
         M = self.plant.CalcMassMatrix(self.plant_context)
         Cv = self.plant.CalcBiasTerm(self.plant_context)    
@@ -235,7 +237,7 @@ class OSC(LeafSystem):
         # If we exceed iteration limits use the previous solution
         if not result.is_success():            
             print("Solver not working, pal!!!  ", t)
-            usol = self.u
+            usol = self.u/10
         else:
             usol = result.GetSolution(u)
             self.acc = result.GetSolution(vdot)
@@ -247,6 +249,7 @@ class OSC(LeafSystem):
     ## Ignore ##
     def CalcTorques(self, context: Context, output: BasicVector) -> None:
         usol = self.solveQP(context)
+        self.usol = usol
         output.SetFromVector(usol)
     def get_traj_input_port(self, traj_name):
         return self.get_input_port(self.traj_input_ports[traj_name])    

@@ -100,10 +100,12 @@ def find_throwing_trajectory(N, initial_state, jumpheight, tf, jumpheight_tol=5e
   velocity_tol = np.array([(2*g*jumpheight_tol)**0.5])
   velocity_tol = 1e-2
   # prog.AddLinearEqualityConstraint(xf[n_q+1], final_configuration)
-  final_zvel_constraint = prog.AddBoundingBoxConstraint(required_velocity-velocity_tol, required_velocity+velocity_tol, xf[n_q+1])
+  final_zvel_constraint = prog.AddBoundingBoxConstraint(required_velocity-velocity_tol, required_velocity+velocity_tol, xf[n_q+1]) 
   final_zvel_constraint.evaluator().set_description("Final Z velocity constraint")
   # robot.SetPositionsAndVelocities(context, xf)
   # com_pos = robot.CalcCenterOfMassPositionInWorld(context).ravel()  
+  #X vel constraint
+  # prog.AddBoundingBoxConstraint(0, .2+velocity_tol, xf[n_q])
 
   """TODO: Add Bounding Box constraint on Final Angular Momentum"""
 
@@ -112,15 +114,15 @@ def find_throwing_trajectory(N, initial_state, jumpheight, tf, jumpheight_tol=5e
 
   # TODO: Add the cost function here
   for i in range(N-1):
-      #  prog.AddQuadraticCost(0.5*(timesteps[i+1]-timesteps[i])*((u[i].T@u[i])+(u[i+1].T@u[i+1])))
        prog.AddQuadraticCost(0.5*(u[i] - u[i+1]).T @ (u[i] - u[i+1]).T)
        prog.AddLinearConstraint(x[i][1], 0.6, 1.1)
        prog.AddLinearConstraint(x[i][0], -1e-2, 1e-2)
        prog.AddLinearConstraint(x[i][2], -1e-4, 1e-4)
        if i>=N-3:
-        prog.AddLinearConstraint(x[i][n_q+1] - x[i+1][n_q+1], 0, 30)        
+        prog.AddLinearConstraint(x[i+1][n_q+1] - x[i][n_q+1] , -9, 30)        
        else:
-        prog.AddLinearConstraint(x[i][n_q+1] - x[i+1][n_q+1], -20, 9)
+        prog.AddLinearConstraint(x[i+1][n_q+1] - x[i][n_q+1], -20, 9)
+        prog.AddLinearConstraint(x[i][n_q] - x[i+1][n_q], -.01, .01)
   
 
   # TODO: Add bounding box constraints on the inputs and qdot 
