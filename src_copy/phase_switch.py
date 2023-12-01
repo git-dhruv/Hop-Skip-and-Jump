@@ -37,7 +37,7 @@ class PhaseSwitch(LeafSystem):
         statePacket = fetchStates(self.plant_context, self.plant)
         t  = context.get_time()
         phase = 0
-        if phase == 0 and self.phase is None:
+        if t<=1.1*self.jump_time: # and self.phase is None:
             phase = 1
             self.phase = phase
         if (t>1.1*self.jump_time or statePacket['com_vel'][-1] > required_vel) and statePacket['left_leg'][-1] > 1e-2 and statePacket['right_leg'][-1] > 1e-2:
