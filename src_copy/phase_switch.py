@@ -40,7 +40,8 @@ class PhaseSwitch(LeafSystem):
         if t<=1.1*self.jump_time: # and self.phase is None:
             phase = 1
             self.phase = phase
-        if (t>1.1*self.jump_time or statePacket['com_vel'][-1] > required_vel) and statePacket['left_leg'][-1] > 1e-2 and statePacket['right_leg'][-1] > 1e-2:
+
+        if (t>0.9*self.jump_time or statePacket['com_vel'][-1] > 0.9*required_vel) and statePacket['left_leg'][-1] > 0 and statePacket['right_leg'][-1] > 0:
             phase = 2
             self.phase = phase
         if  statePacket['left_leg'][-1] < 1e-2 and statePacket["right_leg"][-1] < 1e-2 and t>1.5*self.jump_time:
