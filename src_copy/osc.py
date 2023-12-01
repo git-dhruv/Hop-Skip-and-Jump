@@ -89,9 +89,35 @@ class OSC(LeafSystem):
 
     def fetchTrackParams(self):
         ##@TODO: Take FSM as a Class parameter and record the particular objective. Also record the FSM 
-        return {'COM_pos_d': self.tracking_objective_preflight.COMTracker.desiredPos, 'COM_vel_d':self.tracking_objective_land.COMTracker.desiredVel,
-               'Torso_pos_d': self.tracking_objective_land.TorsoTracker.desiredPos, 'Torso_vel_d':self.tracking_objective_land.TorsoTracker.desiredVel,
-               'LFoot_pos_d': self.tracking_objective_air.FootTracker.desiredPos[:3], 'RFoot_vel_d': self.tracking_objective_air.FootTracker.desiredPos[3:],
+        ## Based on the FSM tracking objectives are Decided
+        INACTIVE = 0
+        if self.fsm == PREFLIGHT:
+            COM_pos_d = self.tracking_objective_preflight.COMTracker.desiredPos
+            COM_vel_d = self.tracking_objective_preflight.COMTracker.desiredVel
+            Torso_pos_d = self.tracking_objective_preflight.TorsoTracker.desiredPos
+            Torso_vel_d = self.tracking_objective_preflight.TorsoTracker.desiredVel
+            LFoot_pos_d = self.tracking_objective_air.FootTracker.desiredPos[:3]*INACTIVE
+            RFoot_pos_d = self.tracking_objective_air.FootTracker.desiredPos[3:]*INACTIVE
+        elif self.fsm == FLIGHT:
+            COM_pos_d = self.tracking_objective_preflight.COMTracker.desiredPos*INACTIVE
+            COM_vel_d = self.tracking_objective_preflight.COMTracker.desiredVel*INACTIVE
+            Torso_pos_d = self.tracking_objective_preflight.TorsoTracker.desiredPos*INACTIVE
+            Torso_vel_d = self.tracking_objective_preflight.TorsoTracker.desiredVel*INACTIVE
+            LFoot_pos_d = self.tracking_objective_air.FootTracker.desiredPos[:3]
+            RFoot_pos_d = self.tracking_objective_air.FootTracker.desiredPos[3:]
+        elif self.fsm == LAND:
+            COM_pos_d = self.tracking_objective_land.COMTracker.desiredPos
+            COM_vel_d = self.tracking_objective_land.COMTracker.desiredVel
+            Torso_pos_d = self.tracking_objective_land.TorsoTracker.desiredPos
+            Torso_vel_d = self.tracking_objective_land.TorsoTracker.desiredVel
+            LFoot_pos_d = self.tracking_objective_air.FootTracker.desiredPos[:3]*INACTIVE
+            RFoot_pos_d = self.tracking_objective_air.FootTracker.desiredPos[3:]*INACTIVE
+        else:
+            raise Exception(f"Incorrect FSM Mode Supplied, FSM = {self.fsm}!")
+        
+        return {'COM_pos_d': COM_pos_d, 'COM_vel_d':COM_vel_d,
+               'Torso_pos_d': Torso_pos_d, 'Torso_vel_d':Torso_vel_d,
+               'LFoot_pos_d': LFoot_pos_d, 'RFoot_vel_d': RFoot_pos_d,
                'FSM': np.diag([self.fsm])}
                 
     def logParse(self, x):
