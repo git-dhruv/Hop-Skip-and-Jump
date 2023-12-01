@@ -114,11 +114,13 @@ def find_throwing_trajectory(N, initial_state, jumpheight, tf, jumpheight_tol=5e
   for i in range(N-1):
       #  prog.AddQuadraticCost(0.5*(timesteps[i+1]-timesteps[i])*((u[i].T@u[i])+(u[i+1].T@u[i+1])))
        prog.AddQuadraticCost(0.5*(u[i] - u[i+1]).T @ (u[i] - u[i+1]).T)
-       prog.AddLinearConstraint(x[i][1], 0.6, 1)
+       prog.AddLinearConstraint(x[i][1], 0.6, 1.1)
        prog.AddLinearConstraint(x[i][0], -1e-2, 1e-2)
        prog.AddLinearConstraint(x[i][2], -1e-4, 1e-4)
-       prog.AddLinearConstraint(x[i][1] - x[i+1][1], -1e-1, 1e-1)
-
+       if i>=N-3:
+        prog.AddLinearConstraint(x[i][n_q+1] - x[i+1][n_q+1], 0, 30)        
+       else:
+        prog.AddLinearConstraint(x[i][n_q+1] - x[i+1][n_q+1], -20, 9)
   
 
   # TODO: Add bounding box constraints on the inputs and qdot 
@@ -157,18 +159,18 @@ def find_throwing_trajectory(N, initial_state, jumpheight, tf, jumpheight_tol=5e
   # x_guess = np.load("/home/anirudhkailaje/Documents/01_UPenn/02_MEAM5170/03_FinalProject/src/traj.npy")
   # x_init = x_guess[:, ::(x_guess.shape[1])//N][:,:N].T
 
-  x_init = np.load('/home/dhruv/Hop-Skip-and-Jump/x.npy')#np.linspace(initial_state, initial_state, N)
-  u_init = np.load('/home/dhruv/Hop-Skip-and-Jump/u.npy') #np.random.uniform(low = -effort_limits, high = effort_limits, size=(N, n_u))/1e1
+  x_init = np.load('/home/dhruv/Hop-Skip-and-Jump/src/10NX.npy')#np.linspace(initial_state, initial_state, N)
+  u_init = np.load('/home/dhruv/Hop-Skip-and-Jump/src/10NU.npy') #np.random.uniform(low = -effort_limits, high = effort_limits, size=(N, n_u))/1e1
   lambda_init = np.zeros((N, 8))
   lambda_c_col_init = np.zeros((N-1, 8))
   
-  prog.SetInitialGuess(x, x_init)
-  prog.SetInitialGuess(u, u_init)
+  # prog.SetInitialGuess(x, x_init)
+  # prog.SetInitialGuess(u, u_init)
   prog.SetInitialGuess(lambda_c, lambda_init)
   prog.SetInitialGuess(lambda_c_col, lambda_c_col_init)
 
   print("Starting the solve")
-  prog.SetSolverOption(SolverType.kSnopt, "Major iterations limit", 10) #10000
+  prog.SetSolverOption(SolverType.kSnopt, "Major iterations limit", 30000) #10000
   # Set up solver
   result = Solve(prog)
   

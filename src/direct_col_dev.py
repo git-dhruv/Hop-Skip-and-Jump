@@ -52,7 +52,7 @@ def find_throwing_trajectory(N, initial_state, jumpheight, tf, jumpheight_tol=5e
 
   builder = DiagramBuilder()
   plant = builder.AddSystem(MultibodyPlant(0.0))
-  file_name = "/home/anirudhkailaje/Documents/01_UPenn/02_MEAM5170/03_FinalProject/src/planar_walker.urdf"
+  file_name = "/home/dhruv/Hop-Skip-and-Jump/models/planar_walker.urdf"
   Parser(plant=plant).AddModels(file_name)
   plant.WeldFrames(plant.world_frame(),plant.GetBodyByName("base").body_frame(),RigidTransform.Identity())
   plant.Finalize()
@@ -97,7 +97,7 @@ def find_throwing_trajectory(N, initial_state, jumpheight, tf, jumpheight_tol=5e
   # prog.AddLinearEqualityConstraint(xf, final_state)
 
   """Jump velocity constraints"""
-  required_velocity = (2*g*jumpheight)**0.5
+  required_velocity = (2*g*jumpheight)**0.5 + 0.2
   velocity_tol = np.array([(2*g*jumpheight_tol)**0.5])
   velocity_tol = 1e-2
   # prog.AddLinearEqualityConstraint(xf[n_q+1], final_configuration)
@@ -115,10 +115,14 @@ def find_throwing_trajectory(N, initial_state, jumpheight, tf, jumpheight_tol=5e
   for i in range(N-1):
       #  prog.AddQuadraticCost(0.5*(timesteps[i+1]-timesteps[i])*((u[i].T@u[i])+(u[i+1].T@u[i+1])))
        prog.AddQuadraticCost(0.5*(u[i] - u[i+1]).T @ (u[i] - u[i+1]).T)
-       prog.AddLinearConstraint(x[i][1], 0.6, 1)
+       prog.AddLinearConstraint(x[i][1], 0.6, 1.1)
        prog.AddLinearConstraint(x[i][0], -1e-2, 1e-2)
        prog.AddLinearConstraint(x[i][2], -1e-4, 1e-4)
-       prog.AddLinearConstraint(x[i][1] - x[i+1][1], -1e-1, 1e-1)
+      #  prog.AddLinearConstraint(x[i][1] - x[i+1][1], -5e-1, 1e-1)
+       if i>N-2:
+        pass        
+       else:
+        prog.AddLinearConstraint(x[i][n_q+1] - x[i+1][n_q+1], -20, 9)
 
   
 
@@ -158,8 +162,8 @@ def find_throwing_trajectory(N, initial_state, jumpheight, tf, jumpheight_tol=5e
   # x_guess = np.load("/home/anirudhkailaje/Documents/01_UPenn/02_MEAM5170/03_FinalProject/src/traj.npy")
   # x_init = x_guess[:, ::(x_guess.shape[1])//N][:,:N].T
 
-  x_init = np.load('/home/anirudhkailaje/Documents/01_UPenn/02_MEAM5170/03_FinalProject/x.npy')#np.linspace(initial_state, initial_state, N)
-  u_init = np.load('/home/anirudhkailaje/Documents/01_UPenn/02_MEAM5170/03_FinalProject/u.npy') #np.random.uniform(low = -effort_limits, high = effort_limits, size=(N, n_u))/1e1
+  x_init = np.linspace(initial_state, initial_state, N) #np.load('/home/dhruv/Hop-Skip-and-Jump/x.npy')#np.linspace(initial_state, initial_state, N)
+  u_init = np.random.uniform(low = -effort_limits, high = effort_limits, size=(N, n_u))/1e1
   lambda_init = np.zeros((N, 8))
   lambda_c_col_init = np.zeros((N-1, 8))
   
@@ -169,7 +173,7 @@ def find_throwing_trajectory(N, initial_state, jumpheight, tf, jumpheight_tol=5e
   prog.SetInitialGuess(lambda_c_col, lambda_c_col_init)
 
   print("Starting the solve")
-  prog.SetSolverOption(SolverType.kSnopt, "Major iterations limit", 10000)
+  prog.SetSolverOption(SolverType.kSnopt, "Major iterations limit", 30000)
   # Set up solver
   result = Solve(prog)
   

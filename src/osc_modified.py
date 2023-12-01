@@ -256,7 +256,7 @@ class OperationalSpaceWalkingController(LeafSystem):
         # If we exceed iteration limits use the previous solution
         if not result.is_success():
             print("Solver not working, pal!!!")
-            usol = self.u
+            usol = 100*self.u/np.linalg.norm(self.u)
         else:
             usol = result.GetSolution(u)
             self.u = usol

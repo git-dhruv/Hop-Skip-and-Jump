@@ -7,7 +7,7 @@ from pydrake.multibody.all import JacobianWrtVariable
 from pydrake.multibody.plant import MultibodyPlant
 from pydrake.multibody.parsing import Parser
 from pydrake.math import RigidTransform
-
+from copy import deepcopy
 PREFLIGHT = 0
 FLIGHT = 1
 LAND = 2
@@ -59,7 +59,7 @@ class valueFetcher:
     
     def getVal(self,traj, t):
         if self.type == 1:
-            return traj.value(t).ravel() #, traj.derivative(2).value(t).ravel()
+            return traj.value(t).ravel() 
         return traj.value().ravel()
 
 class pid:
@@ -74,8 +74,8 @@ class pid:
 
         e = ydes - y
         if angular:
-            e = optyaw(ydes, y)
-            out = self.Kp@e - self.Kd@ydot
+            # e = optyaw(ydes, y)
+            out = (self.Kp@e - self.Kd@ydot)
         else:
             out = yddotdes + self.Kp@e - self.Kd@(ydot)
 
@@ -116,21 +116,18 @@ class fetchCOMParams:
     def getAcc(self, ydes, t, finiteState):
         if finiteState == LAND:
             yd = self.getVal.getVal(ydes, t)
+            yd_ddotdes = yd*0
         if finiteState == PREFLIGHT:
+            
             # We dont care about the polytraj in Preflight because it will always be preflight
             yd = self.getVal.getVal(ydes, t)
             yd = self.convertStateToCOM(yd)
             ## Yes these are state accelerations but we approximate base frame as COM
             acc = ydes.derivative(2).value(t).ravel()
-            yd_ddotdes = np.array([acc[0], 0, acc[1]]) 
-
+            yd_ddotdes = np.array([0, 0, acc[1]]) 
+            if t>0.2:
+                yd_ddotdes = np.array([0, 0, 9.81])
             
-
-        
-        ## @WARN this is not added to the PID yet and is merely an accessor ##
-        # if yddot_des is None:
-        #     yddot_des = yd*0
-
         y = self.CalcY()
         ydot = self.CalcYdot()    
 
@@ -152,7 +149,7 @@ class fetchCOMParams:
     
     def convertStateToCOM(self, state):
         ## Replace this with deep copy of plant ##
-        from copy import deepcopy
+        
         plant = deepcopy(self.plant)
         # plant = MultibodyPlant(0.0)
         # parser = Parser(plant)

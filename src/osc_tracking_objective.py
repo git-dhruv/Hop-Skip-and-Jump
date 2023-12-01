@@ -8,7 +8,15 @@ from pydrake.trajectories import Trajectory
 from pydrake.systems.framework import Context
 from pydrake.multibody.plant import MultibodyPlant
 from pydrake.multibody.all import JacobianWrtVariable
+from copy import deepcopy
+from pydrake.multibody.plant import MultibodyPlant
+from pydrake.multibody.parsing import Parser
+from pydrake.math import RigidTransform
 
+from pydrake.systems.framework import Context, LeafSystem, BasicVector
+from pydrake.trajectories import Trajectory, PiecewisePolynomial
+from pydrake.solvers import MathematicalProgram, OsqpSolver
+from pydrake.common.value import AbstractValue
 
 
 
@@ -63,9 +71,9 @@ class OperationalSpaceTrackingObjective(ABC):
         if yd.shape[0] > 1:
             yd = self.fetchStates(yd)
             acc = y_des_traj.derivative(2).value(t).ravel()
-            yd_ddot = np.array([acc[0], 0, acc[1]]) #Scheme
+            yd_ddot = np.array([0, 0, acc[1]]) #Scheme
             # yd[0] = y[0]; yd[2] = 0.8
-            # print(y - yd)
+            print(yd_ddot[-1].round(1))
 
         self.yddot_cmd = yd_ddot - self.kp @ (y - yd) - self.kd @ (ydot)
         self.yddot_cmd = np.clip(self.yddot_cmd, -30, 30)
@@ -82,7 +90,16 @@ class OperationalSpaceTrackingObjective(ABC):
     
     def fetchStates(self, state):
         
-        plant = deepcopy(self.plant)    
+        plant = MultibodyPlant(0.0)
+        parser = Parser(plant)
+        parser.AddModels("../models/planar_walker.urdf")
+        plant.WeldFrames(
+            plant.world_frame(),
+            plant.GetBodyByName("base").body_frame(),
+            RigidTransform.Identity()
+        )
+        plant.Finalize()
+    
         context = plant.CreateDefaultContext()
         
         #Get the internal robot to go to current state

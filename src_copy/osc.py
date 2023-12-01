@@ -45,14 +45,15 @@ class OSC(LeafSystem):
 
 
         ## ___________Parameters for tracking___________ ##
-        self.whatToTrack = [['COM', 'torso'],['foot'],['COM', 'torso']]
+        self.whatToTrack = [['COM', 'torso'],['foot', 'torso'],['COM', 'torso']]
         
-        COMParams = {'Kp': np.diag([60, 0, 60]), 'Kd': np.diag([100, 0, 100])/5 , 'saturations': 20} #Max Lim: 1 G
-        TorsoParams = {'Kp': np.diag([50]), 'Kd': np.diag([2]) , 'saturations': 15*np.pi/180} #Max Lim: 5 deg/s
+        COMParams = {'Kp': np.diag([60, 0, 60]), 'Kd': np.diag([100, 0, 100])/25 , 'saturations': 50} #Max Lim: 1 G
+        COMParams_land = {'Kp': np.diag([600, 0, 600]), 'Kd': np.diag([100, 0, 100]) , 'saturations': 50} #Max Lim: 1 G
+        TorsoParams = {'Kp': np.diag([5]), 'Kd': np.diag([2]) , 'saturations': 50*np.pi/180} #Max Lim: 5 deg/s2
         footParams = {'Kp': 700*np.eye(3,3), 'Kd': 30*np.eye(3,3) , 'saturations': 50000} #Max Lim: 10 m/s2
         ## Cost Weights ##
         self.WCOM = np.eye(3,3)
-        self.WTorso = np.diag([0.1]) 
+        self.WTorso = np.diag([20]) 
         self.wFoot = np.array([[2,0,0],[0,2,0],[0,0,2]])
         self.Costs = {'COM': self.WCOM, 'torso' : self.WTorso, 'foot': self.wFoot} 
         ##_______________________________________________##
@@ -64,8 +65,8 @@ class OSC(LeafSystem):
 
         # !WARNING : IT IS ASSUMED THAT OSC AND OSC_TRACKING SHARE THE SAME PLANT!
         self.tracking_objective_preflight = tracking_objective(self.plant, self.plant_context, COMParams, TorsoParams, None, polyTraj=1)
-        self.tracking_objective_air = tracking_objective(self.plant, self.plant_context, None, None, footParams, polyTraj=0)
-        self.tracking_objective_land = tracking_objective(self.plant, self.plant_context, COMParams, TorsoParams, None, polyTraj=0)
+        self.tracking_objective_air = tracking_objective(self.plant, self.plant_context, None, TorsoParams, footParams, polyTraj=0)
+        self.tracking_objective_land = tracking_objective(self.plant, self.plant_context, COMParams_land, TorsoParams, None, polyTraj=0)
 
 
         ## ______________Declaring Ports______________ ##        
@@ -99,12 +100,11 @@ class OSC(LeafSystem):
         T_VEL = x[i[3]:i[4],:]
         left = x[i[4]:i[5],:]
         right = x[i[5]:i[6],:]
-        COM_POS_DESIRED = x[i[6]:i[7],:]
-        COM_VEL_DESIRED = x[i[7]:i[8],:]
-        Torso_POS_DESIRED = x[i[8]:i[9],:]
-        Torso_VEL_DESIRED = x[i[9]:i[10],:]
-        Ft_POS_DESIRED = x[i[10]:i[11],:]
-        Ft_POS_DESIRED = x[i[11]:i[12],:]
+        COM_POS_DESIRED = x[i[8]:i[9],:]
+        COM_VEL_DESIRED = x[i[9]:i[10],:]
+        Torso_POS_DESIRED = x[i[10]:i[11],:]
+        Torso_VEL_DESIRED = x[i[11]:i[12],:]
+        Ft_POS_DESIRED = x[i[13]:i[14],:]
         return COM_POS, COM_VEL, T_POS, T_VEL, left, right, COM_POS_DESIRED, COM_VEL_DESIRED, Torso_POS_DESIRED, Torso_VEL_DESIRED, Ft_POS_DESIRED, Ft_POS_DESIRED
         
     def logCB(self, context, output):
@@ -145,6 +145,7 @@ class OSC(LeafSystem):
 
         fsm = int(self.EvalAbstractInput(context, self.phaseInput).get_value().get_value()) - 1
 
+
         ## Create the Mathematical Program ##
         qp = MathematicalProgram()
         u = qp.NewContinuousVariables(self.plant.num_actuators(), "u")
@@ -155,19 +156,35 @@ class OSC(LeafSystem):
         whatToTrack = self.whatToTrack[fsm]
         for track in whatToTrack:
             #Get desired trajectory and costs
-            traj = self.EvalAbstractInput(context, self.traj_input_ports[fsm]).get_value()
+            if 'torso' in track:
+                if fsm == PREFLIGHT:
+                    traj = PiecewisePolynomial(np.zeros(1,))
+                else:
+                    traj = BasicVector(np.zeros(1,))
+            else:
+                traj = self.EvalAbstractInput(context, self.traj_input_ports[fsm]).get_value()
             cost = self.Costs[track]
             
             ## In Air Phase has foot trajectory to track
-            if 'foot' in track:
-                for footNum in [0, 1]:
-                    # Get what to track and system states
-                    yddot_cmd_i, J_i, JdotV_i = self.tracking_objective_air.Update(t, traj, track, footNum)
-                    yii = JdotV_i + J_i@vdot
-                    qp.AddQuadraticCost( (yddot_cmd_i - yii).T@cost@(yddot_cmd_i - yii) )
+            if fsm==FLIGHT:
+                if 'foot' in track:
+                    for footNum in [0, 1]:
+                        # Get what to track and system states
+                        yddot_cmd_i, J_i, JdotV_i = self.tracking_objective_air.Update(t, traj, track, footNum)
+                        yii = JdotV_i + J_i@vdot
+                        qp.AddQuadraticCost( (yddot_cmd_i - yii).T@cost@(yddot_cmd_i - yii) )
+                    else:
+                        yddot_cmd_i, J_i, JdotV_i = self.tracking_objective_air.Update(t, traj, track, footNum)
+                        yii = JdotV_i + J_i@vdot
+                        qp.AddQuadraticCost( (yddot_cmd_i - yii).T@cost@(yddot_cmd_i - yii) )
+                        
             ## Preflight and Land phase has other things to track
-            else:
-                yddot_cmd_i, J_i, JdotV_i = self.tracking_objective_land.Update(t, traj, track)    
+            if fsm==PREFLIGHT:
+                yddot_cmd_i, J_i, JdotV_i = self.tracking_objective_preflight.Update(t, traj, track, finiteState=fsm)    
+                yii = JdotV_i + J_i@vdot
+                qp.AddQuadraticCost( (yddot_cmd_i - yii).T@cost@(yddot_cmd_i - yii) )
+            if fsm==LAND:
+                yddot_cmd_i, J_i, JdotV_i = self.tracking_objective_land.Update(t, traj, track, finiteState=fsm)    
                 yii = JdotV_i + J_i@vdot
                 qp.AddQuadraticCost( (yddot_cmd_i - yii).T@cost@(yddot_cmd_i - yii) )
 
@@ -182,7 +199,7 @@ class OSC(LeafSystem):
         B = self.plant.MakeActuationMatrix()
 
         #Calculate Contact Jacobians
-        if self.inAir == 0:
+        if fsm != FLIGHT:
             J_c, J_c_dot_v = calculateDoubleContactJacobians(self.plant, self.plant_context)
             #Dynamics
             qp.AddLinearEqualityConstraint(M@vdot + Cv + G - B@u - J_c.T@lambda_c, np.zeros((7,)))
@@ -201,6 +218,7 @@ class OSC(LeafSystem):
             qp.AddLinearEqualityConstraint(lambda_c[4] == 0)
         else:
             qp.AddLinearEqualityConstraint(M@vdot + Cv + G - B@u, np.zeros((7,)))
+
         for i in range(len(u)):
             qp.AddLinearConstraint(u[i], np.array([-1400]), np.array([1400]))
 
@@ -222,8 +240,6 @@ class OSC(LeafSystem):
             self.u = usol        
         if  np.linalg.norm(usol)>1400:
             usol = 1400*usol/np.linalg.norm(usol)
-        import time
-        # time.sleep(0.05)
         return usol
 
     ## Ignore ##

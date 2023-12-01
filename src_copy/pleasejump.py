@@ -52,7 +52,7 @@ print("Direct Collocation Completed")
 ### Building the Diagram ###
 
 #Connections 
-PhaseSwitcher = builder.AddSystem(PhaseSwitch(jump_height, tf, x_traj, 0.7))
+PhaseSwitcher = builder.AddSystem(PhaseSwitch(jump_height, tf, x_traj, 0.7, file_name))
 OScontroller = builder.AddSystem(OSC(file_name))
 logger = LogVectorOutput(OScontroller.GetOutputPort("logs"),builder)
 builder.Connect(PhaseSwitcher.get_preflight_port_index(),OScontroller.get_preflightinput_port_index())

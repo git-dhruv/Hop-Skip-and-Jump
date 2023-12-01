@@ -10,11 +10,11 @@ from copy import deepcopy
 
 
 class PhaseSwitch(LeafSystem):
-    def __init__(self, height, jump_time, x_traj, z_des):
+    def __init__(self, height, jump_time, x_traj, z_des, model):
         LeafSystem.__init__(self)
         self.plant = MultibodyPlant(0.0)
         self.parser = Parser(self.plant)
-        self.parser.AddModels("models/planar_walker.urdf")
+        self.parser.AddModels(model)
         self.plant.WeldFrames(self.plant.world_frame(), self.plant.GetBodyByName("base").body_frame(), RigidTransform.Identity())
         self.plant.Finalize()
         self.req_height = height
@@ -40,7 +40,7 @@ class PhaseSwitch(LeafSystem):
             phase = 1
         if (t>1.1*self.jump_time or statePacket['com_vel'][-1] > 0.97*required_vel) and statePacket['left_leg'][-1] > 1e-2 and statePacket['right_leg'][-1] > 1e-2:
             phase = 2
-        if statePacket['com_vel'][-1] < 0 and statePacket['left_leg'][-1] < 1e-2 and statePacket["right_leg"][-1] < 1e-2 and t>self.jump_time:
+        if  statePacket['left_leg'][-1] < 1e-2 and statePacket["right_leg"][-1] < 1e-2 and t>1.5*self.jump_time:
             phase = 3
         return phase
     
