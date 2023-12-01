@@ -57,17 +57,20 @@ class PhaseSwitch(LeafSystem):
             leftleg = statePacket['left_leg']
             rightleg = statePacket['right_leg']
 
+            XOffset = 0.16
+            ZOffset = 0.97
             if leftleg[0] > rightleg[0]:
-                output.set_value(BasicVector([com[0]+0.3, 0 , np.clip(com[-1]-0.6,0, np.inf), com[0]-0.3, 0 , np.clip(com[-1]-0.6,0, np.inf)]))
+                output.set_value(BasicVector([com[0]+XOffset  , 0 , np.clip(com[-1]-ZOffset,0, np.inf), com[0]-XOffset, 0 , np.clip(com[-1]-ZOffset,0, np.inf)]))
             else:
-                output.set_value(BasicVector([com[0]-0.3, 0 , np.clip(com[-1]-0.6,0, np.inf), com[0]+0.3, 0 , np.clip(com[-1]-0.6,0, np.inf)]))
+                output.set_value(BasicVector([com[0]-XOffset, 0 , np.clip(com[-1]-ZOffset,0, np.inf), com[0]+XOffset, 0 , np.clip(com[-1]-ZOffset,0, np.inf)]))
 
     def SetLandingOutput(self, x, output):
         phase = self.DeterminePhase(x)
         if phase == 3:
             statePacket = fetchStates(self.plant_context, self.plant)
             com = statePacket['com_pos']
-            output.set_value(BasicVector([com[0],0,float(self.z_des)]))
+            swingFootCenterPos = (statePacket['left_leg'][0] + statePacket['right_leg'][0])/2
+            output.set_value(BasicVector([swingFootCenterPos,0,float(self.z_des)]))
 
     def PhaseOutput(self, x, output):
         phase = self.DeterminePhase(x)

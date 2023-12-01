@@ -168,7 +168,7 @@ class OSC(LeafSystem):
             
             ## In Air Phase has foot trajectory to track
             if fsm==FLIGHT:
-                qp.AddQuadraticCost( 1e-1*u.T@u )
+                qp.AddQuadraticCost( 1e-3*u.T@u )
                 if 'foot' in track:
                     for footNum in [0, 1]:
                         # Get what to track and system states

@@ -212,11 +212,15 @@ class fetchFootParams:
         y = self.CalcY()
         ydot = self.CalcYdot()    
         yd = self.getVal.getVal(ydes, t)    
-        com = fetchStates(self.context, self.plant )['com_pos']
+        # com = fetchStates(self.context, self.plant )['com_pos']
+        # if fsm:
+        #     target = np.array([com[0]+0.3, 0 , np.clip(com[-1]-0.6,0, np.inf)])
+        # else:
+        #     target = np.array([com[0]-0.3, 0 , np.clip(com[-1]-0.6,0, np.inf)])
         if fsm:
-            target = np.array([com[0]+0.3, 0 , np.clip(com[-1]-0.6,0, np.inf)])
+            target = yd[:3]
         else:
-            target = np.array([com[0]-0.3, 0 , np.clip(com[-1]-0.6,0, np.inf)])
+            target = yd[3:]
 
         self.desiredPos = target; self.desiredVel = target*0
         return self.pid.calcOut(y, target, ydot, y*0)

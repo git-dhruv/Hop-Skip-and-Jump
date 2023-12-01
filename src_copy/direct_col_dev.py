@@ -113,18 +113,19 @@ def find_throwing_trajectory(N, initial_state, jumpheight, tf, jumpheight_tol=5e
   AddCollocationConstraints(prog, robot, context, N, x, u, lambda_c, lambda_c_col, gamma, gamma_col, timesteps)
 
   # TODO: Add the cost function here
+  
   for i in range(N-1):
        prog.AddQuadraticCost(0.5*(u[i] - u[i+1]).T @ (u[i] - u[i+1]).T)
-       prog.AddLinearConstraint(x[i][1], 0.6, 1.1)
+       prog.AddLinearConstraint(x[i][1], 0.6, 1.2)
        prog.AddLinearConstraint(x[i][0], -1e-2, 1e-2)
        prog.AddLinearConstraint(x[i][2], -1e-4, 1e-4)
+       
        if i>=N-3:
         prog.AddLinearConstraint(x[i+1][n_q+1] - x[i][n_q+1] , -9, 30)        
        else:
         prog.AddLinearConstraint(x[i+1][n_q+1] - x[i][n_q+1], -20, 9)
-        prog.AddLinearConstraint(x[i][n_q] - x[i+1][n_q], -.01, .01)
+        prog.AddLinearConstraint(x[i][n_q] - x[i+1][n_q], -.01, .01)        
   
-
   # TODO: Add bounding box constraints on the inputs and qdot 
 
   mu = 1
