@@ -74,7 +74,7 @@ class pid:
 
         e = ydes - y
         if angular:
-            # e = optyaw(ydes, y)
+            e = optyaw(ydes, y)
             out = (self.Kp@e - self.Kd@ydot)
         else:
             out = yddotdes + self.Kp@e - self.Kd@(ydot)

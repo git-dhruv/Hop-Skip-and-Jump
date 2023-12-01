@@ -49,11 +49,11 @@ class OSC(LeafSystem):
         
         COMParams = {'Kp': np.diag([60, 0, 60]), 'Kd': 0*np.diag([100, 0, 100])/25 , 'saturations': 50} #Max Lim: 1 G
         COMParams_land = {'Kp': np.diag([600, 0, 600]), 'Kd': np.diag([100, 0, 100]) , 'saturations': 50} #Max Lim: 1 G
-        TorsoParams = {'Kp': np.diag([5]), 'Kd': np.diag([2]) , 'saturations': 50*np.pi/180} #Max Lim: 5 deg/s2
+        TorsoParams = {'Kp': np.diag([1]), 'Kd': np.diag([2]) , 'saturations': 50} #Max Lim: 5 deg/s2
         footParams = {'Kp': 700*np.eye(3,3), 'Kd': 30*np.eye(3,3) , 'saturations': 50000} #Max Lim: 10 m/s2
         ## Cost Weights ##
         self.WCOM = np.eye(3,3)
-        self.WTorso = np.diag([20]) 
+        self.WTorso = np.diag([10]) 
         self.wFoot = np.array([[2,0,0],[0,2,0],[0,0,2]])
         self.Costs = {'COM': self.WCOM, 'torso' : self.WTorso, 'foot': self.wFoot} 
         ##_______________________________________________##
@@ -173,10 +173,10 @@ class OSC(LeafSystem):
                         yddot_cmd_i, J_i, JdotV_i = self.tracking_objective_air.Update(t, traj, track, footNum)
                         yii = JdotV_i + J_i@vdot
                         qp.AddQuadraticCost( (yddot_cmd_i - yii).T@cost@(yddot_cmd_i - yii) )
-                    else:
-                        yddot_cmd_i, J_i, JdotV_i = self.tracking_objective_air.Update(t, traj, track, footNum)
-                        yii = JdotV_i + J_i@vdot
-                        qp.AddQuadraticCost( (yddot_cmd_i - yii).T@cost@(yddot_cmd_i - yii) )
+                else:
+                    yddot_cmd_i, J_i, JdotV_i = self.tracking_objective_air.Update(t, traj, track, footNum)
+                    yii = JdotV_i + J_i@vdot
+                    qp.AddQuadraticCost( (yddot_cmd_i - yii).T@cost@(yddot_cmd_i - yii) )
                         
             ## Preflight and Land phase has other things to track
             if fsm==PREFLIGHT:
@@ -188,8 +188,10 @@ class OSC(LeafSystem):
                 yii = JdotV_i + J_i@vdot
                 qp.AddQuadraticCost( (yddot_cmd_i - yii).T@cost@(yddot_cmd_i - yii) )
 
+
+
         # qp.AddQuadraticCost( 1e-7*u.T@u )
-        # qp.AddQuadraticCost(0.01*(self.u-u).T@(self.u-u) )
+        qp.AddQuadraticCost(0.01*(self.u-u).T@(self.u-u) )
         # Calculate terms in the manipulator equation
         M = self.plant.CalcMassMatrix(self.plant_context)
         Cv = self.plant.CalcBiasTerm(self.plant_context)    
