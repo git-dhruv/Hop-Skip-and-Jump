@@ -83,7 +83,7 @@ def dir_col(N, initial_state, jumpheight, tf, jumpheight_tol=5e-2):
        if i>=N-3:
         prog.AddLinearConstraint(x[i+1][n_q+1] - x[i][n_q+1] , -9, 30)
         #Adding costs for angular momentum
-        AddAngularMomentumConstraint(prog, robot, context, x[i], 1)
+        # AddAngularMomentumConstraint(prog, robot, context, x[i], 1)
        else:
         prog.AddLinearConstraint(x[i+1][n_q+1] - x[i][n_q+1], -20, 9)
         prog.AddLinearConstraint(x[i][n_q] - x[i+1][n_q], -.01, .01)        
