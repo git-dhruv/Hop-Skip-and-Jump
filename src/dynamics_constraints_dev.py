@@ -167,10 +167,10 @@ def AddCollocationConstraints(prog, robot, context, N, x, u, lambda_c, lambda_c_
 
       mu = 1
       friction_force = lambda x: np.array([mu*x[2]-x[0]-x[1]])
-      frictioncone_constraint1 = friction_force(lambda_c_i[:3]) * gamma_i[:3] #Shape 1
-      frictioncone_constraint2 = friction_force(lambda_c_i[3:]) * gamma_i[3:]
-      frictioncone_constraint3 = friction_force(lambda_c_halfway[:3]) * gamma_halfway[:3]
-      frictioncone_constraint4 = friction_force(lambda_c_halfway[3:]) * gamma_halfway[3:]
+      frictioncone_constraint1 = friction_force(lambda_c_i[:4]) * gamma_i[:3] #Shape 1
+      frictioncone_constraint2 = friction_force(lambda_c_i[4:]) * gamma_i[3:]
+      frictioncone_constraint3 = friction_force(lambda_c_halfway[:4]) * gamma_halfway[:3]
+      frictioncone_constraint4 = friction_force(lambda_c_halfway[4:]) * gamma_halfway[3:]
       frictioncone_constraints = np.concatenate((frictioncone_constraint1, frictioncone_constraint2, frictioncone_constraint3, frictioncone_constraint4))
 
       lambda_x = np.array([lambda_c_i[0],lambda_c_i[0],lambda_c_i[0], lambda_c_i[4], lambda_c_i[4],lambda_c_i[4]])

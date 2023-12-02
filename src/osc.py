@@ -26,6 +26,33 @@ PREFLIGHT = 0
 FLIGHT = 1
 LAND = 2
 
+mu = 1
+friction_force = lambda x: np.array([mu*x[2]-x[0]-x[1]])
+
+def phi(foot):
+    return foot[-1]
+
+def Eq11Helper(vars):
+    gamma = vars[:3]
+    vel = vars[3:6]
+    return gamma+vel
+
+def Eq12Helper(vars):
+    gamma = vars[:3]
+    vel = vars[3:6]
+    return gamma-vel
+
+def Eq13Helper(vars):
+    leg = vars[:3]
+    lambda_c = vars[3:6]
+    lambda_c = vars[6]
+    return leg@lambda_c
+
+def Eq14Helper(vars):
+    gamma = vars[:3]
+    lambda_c = vars[6:]
+    return friction_force(lambda_c)@gamma
+
 module_logger = logging.getLogger("OSC")
 class OSC(LeafSystem):
     def __init__(self, urdf, polyTraj=0):
@@ -42,6 +69,8 @@ class OSC(LeafSystem):
         )
         self.plant.Finalize()
         self.plant_context = self.plant.CreateDefaultContext()
+        self.robot = self.plant.ToAutoDiffXd()
+        self.robot_context = self.robot.CreateDefaultContext()
         
 
 
@@ -257,39 +286,67 @@ class OSC(LeafSystem):
         G = -self.plant.CalcGravityGeneralizedForces(self.plant_context)
         B = self.plant.MakeActuationMatrix()
 
+
         #Calculate Contact Jacobians
-        if self.fsm != FLIGHT:
-            statePacket = fetchStates(self.plant_context, self.plant)
-            qp.AddLinearConstraint(statePacket['left_leg'], 0, np.inf) #Eq 8 
-            qp.AddLinearConstraint(statePacket['right_leg'], 0, np.inf)
-            """Eq 9, Pg 8 from https://groups.csail.mit.edu/robotics-center/public_papers/Posa13.pdf"""
-            qp.AddLinearConstraint(lambda_c[0:2], 0, np.inf) #contact  and y
-            qp.AddLinearConstraint(lambda_c[2], 0, np.inf) # contact z
-            qp.AddLinearConstraint(lambda_c[3:5], 0, np.inf)
-            qp.AddLinearConstraint(lambda_c[5], 0, np.inf)
-            qp.AddLinearConstraint(gamma, 0, np.inf)
-            mu = 1
-            friction_force = lambda x: np.array([mu*x[2]-x[0]-x[1]])
-            """Eq 10, Pg 8 from https://groups.csail.mit.edu/robotics-center/public_papers/Posa13.pdf"""
-            qp.AddLinearConstraint(friction_force(lambda_c[:3]))
-            qp.AddLinearEqualityConstraint(lambda_c[1] == 0) #contact y
-            qp.AddLinearEqualityConstraint(lambda_c[4] == 0)
+        if self.fsm != FLIGHT and t > 0.1:
+            self.robot.SetPositionsAndVelocities(self.robot_context, x)
+            statePacket = fetchStates(self.robot_context, self.robot)
+            # qp.AddLinearConstraint(np.ones_like(statePacket['left_leg'], dtype=np.float64), np.zeros_like(statePacket['left_leg'], dtype=np.float64), np.inf*np.ones_like(statePacket['left_leg'], dtype=np.float64), statePacket['left_leg']) #Eq 8 
+            # qp.AddLinearConstraint(np.ones_liqp.AddConstraint(phi, np.zeros(1)-1e-2, np.inf, statePacket['left_leg'])ke(statePacket['left_leg'], dtype=np.float64), np.zeros_like(statePacket['left_leg'], dtype=np.float64), np.inf*np.ones_like(statePacket['left_leg'], dtype=np.float64), statePacket['left_leg']) #Eq 8 
             
-            qp.AddLinearConstraint()
+            # qp.AddConstraint(phi, np.zeros(1)-1e-2, np.inf, statePacket['right_leg'])
+            qp.AddLinearConstraint(statePacket['left_leg'][-1] >= -1e-2)
+            qp.AddLinearConstraint(statePacket['right_leg'][-1] >= -1e-2)
+            """Eq 9, Pg 8 from https://groups.csail.mit.edu/robotics-center/public_papers/Posa13.pdf"""
+            qp.AddLinearConstraint(lambda_c[0:2], np.zeros_like(lambda_c[0:2]), np.inf*np.ones_like(lambda_c[0:2])) #contact  and y
+            qp.AddLinearConstraint(lambda_c[2], np.zeros_like(lambda_c[2]), np.inf*np.ones_like(lambda_c[2])) # contact z
+            qp.AddLinearConstraint(lambda_c[3:5], np.zeros_like(lambda_c[0:2]), np.inf*np.ones_like(lambda_c[0:2])) 
+            qp.AddLinearConstraint(lambda_c[5], np.zeros_like(lambda_c[2]), np.inf*np.ones_like(lambda_c[2])) 
+            qp.AddLinearConstraint(gamma, np.zeros_like(gamma), np.inf*np.ones_like(gamma))
+            mu = 1
+            
+            """Eq 10, from https://groups.csail.mit.edu/robotics-center/public_papers/Posa13.pdf"""
+            qp.AddLinearConstraint(friction_force(lambda_c[:4]), np.zeros_like(friction_force(lambda_c[:4])), np.inf*np.ones_like(friction_force(lambda_c[:4])))
+            qp.AddLinearConstraint(friction_force(lambda_c[4:]), np.zeros_like(friction_force(lambda_c[:4])), np.inf*np.ones_like(friction_force(lambda_c[:4])))
+            """Eq 11, from https://groups.csail.mit.edu/robotics-center/public_papers/Posa13.pdf"""
+            qp.AddConstraint(Eq11Helper, np.zeros_like(gamma[:3]), np.inf*np.ones_like(gamma[:3]), vars = np.hstack([gamma[:3], statePacket['leftVel']]))
+            qp.AddConstraint(Eq11Helper, np.zeros_like(gamma[3:]), np.inf*np.ones_like(gamma[:3]), vars = np.hstack([gamma[3:], statePacket['rightVel']]))
+            """Eq 12, from https://groups.csail.mit.edu/robotics-center/public_papers/Posa13.pdf"""
+            qp.AddConstraint(Eq12Helper, np.zeros_like(gamma[:3]), np.inf*np.ones_like(gamma[:3]), vars = np.hstack([gamma[:3], statePacket['leftVel']]))
+            qp.AddConstraint(Eq12Helper, np.zeros_like(gamma[3:]), np.inf*np.ones_like(gamma[:3]), vars = np.hstack([gamma[3:], statePacket['rightVel']]))
+            """Eq 13, from https://groups.csail.mit.edu/robotics-center/public_papers/Posa13.pdf"""
+            bound = np.zeros_like(statePacket['left_leg']@lambda_c[4], dtype=np.float64)
+            qp.AddConstraint(Eq13Helper, bound, bound, vars = np.hstack([statePacket['left_leg'], lambda_c[4]]))
+            qp.AddConstraint(Eq13Helper, bound, bound, vars = np.hstack([statePacket['right_leg'], lambda_c[7]]))
+            """Eq 14, from https://groups.csail.mit.edu/robotics-center/public_papers/Posa13.pdf"""
+            bound = np.zeros_like((friction_force(lambda_c[:4])@gamma[:3]), dtype=np.float64)
+            qp.AddConstraint(Eq14Helper, bound, bound, vars = np.hstack([gamma[:3], lambda_c[:4]]))
+            qp.AddConstraint(Eq14Helper, bound, bound, vars = np.hstack([gamma[3:], lambda_c[4:]]))
+            """Eq 15, from https://groups.csail.mit.edu/robotics-center/public_papers/Posa13.pdf"""
+            qp.AddLinearEqualityConstraint((gamma[:3]+statePacket['leftVel']) @ lambda_c[0], np.zeros_like((gamma[:3]+statePacket['leftVel']) @ lambda_c[0], dtype= np.float64))
+            qp.AddLinearEqualityConstraint((gamma[:3]+statePacket['rightVel']) @ lambda_c[4], np.zeros_like((gamma[:3]+statePacket['leftVel']) @ lambda_c[0], dtype= np.float64))
+            """Eq 16, from https://groups.csail.mit.edu/robotics-center/public_papers/Posa13.pdf"""
+            qp.AddLinearEqualityConstraint((gamma[:3]-statePacket['leftVel']) @ lambda_c[1], np.zeros_like((gamma[:3]+statePacket['leftVel']) @ lambda_c[0], dtype= np.float64))
+            qp.AddLinearEqualityConstraint((gamma[:3]-statePacket['rightVel']) @ lambda_c[5], np.zeros_like((gamma[:3]+statePacket['leftVel']) @ lambda_c[0], dtype= np.float64))
+            """y- contact forces at 0"""
+            qp.AddLinearEqualityConstraint(lambda_c[1] == np.zeros_like(lambda_c[1], dtype= np.float64)) #contact y
+            qp.AddLinearEqualityConstraint(lambda_c[4] == np.zeros_like(lambda_c[1], dtype= np.float64))
+            
             J_c, J_c_dot_v = calculateDoubleContactJacobians(self.plant, self.plant_context)
             #Dynamics
-            qp.AddLinearEqualityConstraint(M@vdot + Cv + G - B@u - J_c.T@lambda_c, np.zeros((7,)))
+            contact_force = np.array([lambda_c[0]-lambda_c[1], lambda_c[2], lambda_c[3], lambda_c[4]-lambda_c[5], lambda_c[6], lambda_c[7]])
+            qp.AddLinearEqualityConstraint(M@vdot + Cv + G - B@u - J_c.T@contact_force, np.zeros((7,)))
             #Contact
             qp.AddLinearEqualityConstraint(J_c_dot_v + (J_c@vdot).reshape(-1,1), np.zeros((6,1)))
             # Friction Cone Constraint
-            mu = 1
-            A_fric = np.array([[1, 0, -mu, 0, 0, 0], # Friction constraint for left foot, positive x-direction
-                            [-1, 0, -mu, 0, 0, 0],   # Friction constraint for left foot, negative x-direction
-                            [0, 0, 0, 1, 0, -mu],    # Friction constraint for right foot, positive x-direction
-                            [0, 0, 0, -1, 0, -mu]])  # Friction constraint for right foot, negative x-direction
+            # mu = 1
+            # A_fric = np.array([[1, 0, -mu, 0, 0, 0], # Friction constraint for left foot, positive x-direction
+            #                 [-1, 0, -mu, 0, 0, 0],   # Friction constraint for left foot, negative x-direction
+            #                 [0, 0, 0, 1, 0, -mu],    # Friction constraint for right foot, positive x-direction
+            #                 [0, 0, 0, -1, 0, -mu]])  # Friction constraint for right foot, negative x-direction
 
             # The constraint is applied to the 6x1 lambda_c vector
-            qp.AddLinearConstraint(A_fric @ lambda_c.reshape(6, 1), -np.inf * np.ones((4, 1)), np.zeros((4, 1)))
+            # qp.AddLinearConstraint(A_fric @ lambda_c.reshape(6, 1), -np.inf * np.ones((4, 1)), np.zeros((4, 1)))
             
         else:
             qp.AddLinearEqualityConstraint(M@vdot + Cv + G - B@u, np.zeros((7,)))

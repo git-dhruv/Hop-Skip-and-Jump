@@ -1,23 +1,25 @@
 # %%
 from pydrake.all import StartMeshcat, MeshcatVisualizer, AddMultibodyPlantSceneGraph, HalfSpace, CoulombFriction, MeshcatVisualizerParams, ConstantValueSource, LogVectorOutput
-import matplotlib.pyplot as plt, numpy as np, datetime, pydot, os, logging
+import matplotlib.pyplot as plt, numpy as np, datetime, pydot, os, logging, pickle
 from pydrake.math import RigidTransform
 from pydrake.all import DiagramBuilder, Simulator, Parser
 from direct_col_dev import dir_col
 from phase_switch import *
 from osc import *
 from pydrake.systems.planar_scenegraph_visualizer import (ConnectPlanarSceneGraphVisualizer)
+from pydrake.geometry import Box
 
 runstart = datetime.datetime.now().strftime('%Y-%m-%d_%H-%M-%S')
 file_name = None
 
-folders = ['../logs', '../report', f'../logs/{runstart}']
+folders = ['./logs', './report', f'./logs/{runstart}']
 for folder in folders:
     if not os.path.exists(folder):
         os.mkdir(folder)
 
 logging.basicConfig(filename=f'./logs/{runstart}/Messages.log', level=logging.DEBUG, format='%(asctime)s -  %(name)s - %(levelname)s - %(message)s')
-
+logging.getLogger("matplotlib").setLevel(logging.CRITICAL)
+logging.getLogger("DIRCOL").setLevel(logging.DEBUG)
 
 for root, dirs, files in os.walk('../'):
       for file in files:
@@ -37,16 +39,20 @@ theta = -np.arccos(q[1])
 q[3] = theta; q[4] = -2 * theta
 q[5] = theta;   q[6] = -2 * theta
 initial_state[:7] = q
-###            ###
 
+logging.debug(f"Initial state at {q.round(3)}")
+logging.debug(f"Jump Height: {jump_height}, tf: {tf}, {N} knot points")
 
 ### Designing the Simulator environment ###
 meshcat = StartMeshcat()
 builder = DiagramBuilder()
 plant, scene_graph = AddMultibodyPlantSceneGraph(builder, 0.0005)
-X_WG = HalfSpace.MakePose(np.array([0,0, 1]), np.zeros(3,))
-plant.RegisterCollisionGeometry(plant.world_body(), X_WG, HalfSpace(), 
-    "collision", CoulombFriction(1.0, 1.0))
+X_WG = HalfSpace.MakePose(np.array([0.0,0, 1]), np.zeros(3,))
+plant.RegisterCollisionGeometry(plant.world_body(), X_WG, HalfSpace(), "collision", CoulombFriction(1.0, 1.0))
+#Make a Geometry of Box shape (Doesnt work with half Space)
+plant.RegisterVisualGeometry(plant.world_body(),X_WG,Box(100, 2, 0.001),"ground_visual",np.array([1.0,0.1,0.1,0.1]))
+
+
 parser = Parser(plant)
 parser.AddModels(file_name)
 plant.WeldFrames(plant.world_frame(),
@@ -67,6 +73,7 @@ logging.debug("Direct Collocation Completed")
 
 #Connections 
 OSC_Accesor = OSC(file_name)
+logging.getLogger("OSC").setLevel(logging.DEBUG)
 PhaseSwitcher = builder.AddSystem(PhaseSwitch(jump_height, tf, x_traj, 0.7, file_name))
 OScontroller = builder.AddSystem(OSC_Accesor)
 logger = LogVectorOutput(OScontroller.GetOutputPort("logs"),builder)
@@ -106,18 +113,24 @@ com_pos_list = []
 vel_list = []
 for t in timesteps:
   x = x_traj.vector_values([t])
-  u = np.linalg.norm(u_traj.vector_values([t]))
+  u = u_traj.vector_values([t])
   plant.SetPositionsAndVelocities(plant_context, x)
   com_pos = plant.CalcCenterOfMassPositionInWorld(plant_context).ravel()
-  com_pos_list.append(com_pos)
+  com_pos_list.append(u)
 
 np.save('com.npy', np.array(com_pos_list))
-plt.plot(np.array(com_pos_list))
-
+print(np.array(com_pos_list).shape)
+traj = np.array(com_pos_list)
+plt.plot(traj[:,0])
+plt.plot(traj[:,1])
+plt.plot(traj[:,2])
+plt.plot(traj[:,3])
+# np.save(f'./logs/{runstart}/DirCol_composlist.npy', np.array(com_pos_list))
+# logging.debug(f"Composlist saved at: {f'./logs/{runstart}/DirCol_composlist.npy'}")
 
 # %%
 ### Go ###
-sim_time = tf+2
+sim_time = tf+3
 simulator = Simulator(diagram)
 simulator.Initialize(); simulator.set_target_realtime_rate(1.0)
 plant_context = diagram.GetMutableSubsystemContext(plant, simulator.get_mutable_context())
@@ -126,7 +139,7 @@ visualizer.start_recording()
 simulator.AdvanceTo(sim_time)
 visualizer.stop_recording()
 ani = visualizer.get_recording_as_animation()
-ani.save(f"result.gif", fps=30)
+ani.save(f"./logs/{runstart}/result.gif", fps=30)
 
 # %%
 import matplotlib.pyplot as plt
@@ -137,6 +150,15 @@ t = log.sample_times()[1:]
 x = log.data()[:,1:]
 COM_POS, COM_VEL, T_POS, T_VEL, left, right, COM_POS_DESIRED, COM_VEL_DESIRED, Torso_POS_DESIRED, Torso_VEL_DESIRED, LFt_POS_DESIRED, RFt_POS_DESIRED, FSM, Torque, Costs =  OSC_Accesor.logParse(x)
 FSM = np.int32(FSM)
+
+with open(f"./logs/{runstart}/data.pickle", 'wb') as f:
+    data = [COM_POS, COM_VEL, T_POS, T_VEL, left, right, COM_POS_DESIRED, COM_VEL_DESIRED, Torso_POS_DESIRED, Torso_VEL_DESIRED, LFt_POS_DESIRED, RFt_POS_DESIRED, FSM, Torque, Costs]
+    for i, datum in enumerate(data):
+        data[i] = np.float64(datum)
+    pickle.dump(tuple(data), f)
+
+logging.debug(f"Saved data at: {f'./logs/{runstart}/data.pickle'}")
+
 colors = ['skyblue', 'lightcoral', 'lightgreen']
 # Find boundaries where the finite state changes
 boundaries = np.where(np.diff(FSM[0, :]) != 0)[0]
@@ -154,7 +176,7 @@ def plot_3d_data(ax, t, data, label, linestyle='-', alpha=0.1):
         ax.axvspan(t[start_idx], t[end_idx], color=colors[FSM[0, start_idx]], alpha=alpha, lw=0)
 
 # Create subplots
-fig, axs = plt.subplots(8, 1, figsize=(20, 40))
+fig, axs = plt.subplots(8, 1, figsize=(7, 20))
 
 # Plotting each pair of actual and desired values
 plot_3d_data(axs[0], t, COM_POS, 'COM_POS', alpha=0.1)
@@ -225,9 +247,12 @@ plt.show()
 
 
 # %%
-fig, axs = plt.subplots(1, 1, figsize=(20, 4))
-plot_3d_data(axs, t, left, 'Left', alpha=0.1)
-plot_3d_data(axs, t, np.gradient(left)[0], 'Left', '--', alpha=0.1)
+np.float16(COM_POS)
+
+# %%
+
+
+# %%
 
 
 # %%

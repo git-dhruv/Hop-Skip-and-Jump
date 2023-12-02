@@ -1,0 +1,120 @@
+2023-12-02 14:05:24,697 -  root - DEBUG - Initial state at [ 0.     0.95   0.    -0.318  0.635 -0.318  0.635]
+2023-12-02 14:05:24,697 -  root - DEBUG - Jump Height: 0.5, tf: 0.5, 10 knot points
+2023-12-02 14:05:24,699 -  drake - INFO - Meshcat listening for connections at http://localhost:7001
+2023-12-02 14:05:24,717 -  DIRCOL - DEBUG - Starting the solve
+2023-12-02 14:05:40,039 -  DIRCOL - DEBUG - optimal cost: 5748.158289929805
+2023-12-02 14:05:40,040 -  DIRCOL - DEBUG - x_sol: [[-0.000e+00  9.500e-01 -0.000e+00 -3.200e-01  6.400e-01 -3.200e-01
+   6.400e-01  0.000e+00 -0.000e+00 -0.000e+00  0.000e+00  0.000e+00
+  -0.000e+00  0.000e+00]
+ [-1.000e-02  9.400e-01 -0.000e+00 -4.100e-01  7.800e-01 -3.100e-01
+   6.300e-01  0.000e+00  1.600e-01  3.000e-02 -9.300e-01  1.910e+00
+  -3.300e-01  7.400e-01]
+ [-1.000e-02  9.100e-01 -0.000e+00 -3.900e-01  7.600e-01 -3.700e-01
+   6.300e-01  0.000e+00  2.900e-01  5.000e-02  1.400e-01  2.130e+00
+  -3.220e+00  6.490e+00]
+ [-1.000e-02  9.400e-01 -0.000e+00 -3.600e-01  7.200e-01 -5.400e-01
+   9.800e-01 -1.000e-02  6.200e-01  1.000e-02 -2.900e-01  6.100e-01
+  -2.820e+00  5.570e+00]
+ [-1.000e-02  9.200e-01 -0.000e+00 -4.100e-01  7.200e-01 -6.100e-01
+   1.010e+00 -1.000e-02  1.200e-01 -0.000e+00 -2.840e+00  5.580e+00
+  -1.700e-01 -9.000e-01]
+ [-1.000e-02  9.200e-01 -0.000e+00 -5.900e-01  1.040e+00 -6.000e-01
+   9.800e-01 -1.000e-02  6.000e-02  1.000e-02 -3.390e+00  5.410e+00
+   2.900e-01 -5.900e-01]
+ [-1.000e-02  9.100e-01 -0.000e+00 -7.500e-01  1.260e+00 -5.900e-01
+   9.700e-01  0.000e+00  2.000e-02  3.000e-02 -2.280e+00  1.980e+00
+  -1.800e-01  3.300e-01]
+ [-1.000e-02  9.100e-01 -0.000e+00 -8.300e-01  1.290e+00 -6.500e-01
+   1.080e+00 -0.000e+00 -6.000e-02  3.000e-02 -5.200e-01  6.000e-02
+  -2.470e+00  4.790e+00]
+ [-1.000e-02  9.000e-01  0.000e+00 -8.300e-01  1.270e+00 -8.000e-01
+   1.370e+00  3.000e-02  4.500e-01  1.400e-01  4.900e-01 -1.500e+00
+  -1.400e+00  3.060e+00]
+ [-0.000e+00  1.000e+00  3.000e-02 -6.100e-01  7.600e-01 -5.200e-01
+   5.600e-01  3.800e-01  3.120e+00  1.280e+00  1.335e+01 -3.277e+01
+   2.260e+01 -6.983e+01]]
+2023-12-02 14:05:40,040 -  DIRCOL - DEBUG - u_sol: [[-16.  18. -15.  -8.]
+ [ 21. -17. -26. -38.]
+ [  1.   0. -14. -15.]
+ [-11.   5. -14.  -5.]
+ [ -5.  10.  -1.   3.]
+ [ -1.  -1.  -1.  -0.]
+ [  6.  -2.  -0.  -0.]
+ [  9. -13.   2.  -0.]
+ [ -3.  19.  -2.  -0.]
+ [ 49.  50.  -4. -28.]]
+2023-12-02 14:05:40,040 -  DIRCOL - DEBUG - Required Velocity: 3.1315571206669692
+2023-12-02 14:05:40,040 -  DIRCOL - DEBUG - Achieved Dircol Velocity: 3.1215571206669694
+2023-12-02 14:05:40,040 -  DIRCOL - DEBUG - SolutionResult.kIterationLimit
+2023-12-02 14:05:40,046 -  root - DEBUG - Direct Collocation Completed
+2023-12-02 14:05:40,048 -  OSC - DEBUG - Created OSC
+2023-12-02 14:05:40,048 -  OSC - DEBUG - OSC COM Params: {'Kp': array([[60,  0,  0],
+       [ 0,  0,  0],
+       [ 0,  0, 60]]), 'Kd': array([[0., 0., 0.],
+       [0., 0., 0.],
+       [0., 0., 0.]]), 'saturations': 50}
+2023-12-02 14:05:40,049 -  OSC - DEBUG - OSC COMland Params: {'Kp': array([[60,  0,  0],
+       [ 0,  0,  0],
+       [ 0,  0, 60]]), 'Kd': array([[0., 0., 0.],
+       [0., 0., 0.],
+       [0., 0., 0.]]), 'saturations': 50}
+2023-12-02 14:05:40,049 -  OSC - DEBUG - OSC Torso Params: {'Kp': array([[60,  0,  0],
+       [ 0,  0,  0],
+       [ 0,  0, 60]]), 'Kd': array([[0., 0., 0.],
+       [0., 0., 0.],
+       [0., 0., 0.]]), 'saturations': 50}
+2023-12-02 14:05:40,049 -  OSC - DEBUG - OSC Torsoland Params: {'Kp': array([[60,  0,  0],
+       [ 0,  0,  0],
+       [ 0,  0, 60]]), 'Kd': array([[0., 0., 0.],
+       [0., 0., 0.],
+       [0., 0., 0.]]), 'saturations': 50}
+2023-12-02 14:05:40,049 -  OSC - DEBUG - OSC Foot Params: {'Kp': array([[60,  0,  0],
+       [ 0,  0,  0],
+       [ 0,  0, 60]]), 'Kd': array([[0., 0., 0.],
+       [0., 0., 0.],
+       [0., 0., 0.]]), 'saturations': 50}
+2023-12-02 14:05:40,268 -  PIL.PngImagePlugin - DEBUG - STREAM b'IHDR' 16 13
+2023-12-02 14:05:40,268 -  PIL.PngImagePlugin - DEBUG - STREAM b'sBIT' 41 4
+2023-12-02 14:05:40,268 -  PIL.PngImagePlugin - DEBUG - b'sBIT' 41 4 (unknown)
+2023-12-02 14:05:40,268 -  PIL.PngImagePlugin - DEBUG - STREAM b'pHYs' 57 9
+2023-12-02 14:05:40,268 -  PIL.PngImagePlugin - DEBUG - STREAM b'IDAT' 78 1189
+2023-12-02 14:05:40,272 -  PIL.PngImagePlugin - DEBUG - STREAM b'IHDR' 16 13
+2023-12-02 14:05:40,272 -  PIL.PngImagePlugin - DEBUG - STREAM b'sBIT' 41 4
+2023-12-02 14:05:40,272 -  PIL.PngImagePlugin - DEBUG - b'sBIT' 41 4 (unknown)
+2023-12-02 14:05:40,272 -  PIL.PngImagePlugin - DEBUG - STREAM b'pHYs' 57 9
+2023-12-02 14:05:40,272 -  PIL.PngImagePlugin - DEBUG - STREAM b'IDAT' 78 2994
+2023-12-02 14:05:40,284 -  PIL.PngImagePlugin - DEBUG - STREAM b'IHDR' 16 13
+2023-12-02 14:05:40,284 -  PIL.PngImagePlugin - DEBUG - STREAM b'sBIT' 41 4
+2023-12-02 14:05:40,284 -  PIL.PngImagePlugin - DEBUG - b'sBIT' 41 4 (unknown)
+2023-12-02 14:05:40,284 -  PIL.PngImagePlugin - DEBUG - STREAM b'pHYs' 57 9
+2023-12-02 14:05:40,284 -  PIL.PngImagePlugin - DEBUG - STREAM b'IDAT' 78 374
+2023-12-02 14:05:40,286 -  PIL.PngImagePlugin - DEBUG - STREAM b'IHDR' 16 13
+2023-12-02 14:05:40,286 -  PIL.PngImagePlugin - DEBUG - STREAM b'sBIT' 41 4
+2023-12-02 14:05:40,286 -  PIL.PngImagePlugin - DEBUG - b'sBIT' 41 4 (unknown)
+2023-12-02 14:05:40,286 -  PIL.PngImagePlugin - DEBUG - STREAM b'pHYs' 57 9
+2023-12-02 14:05:40,286 -  PIL.PngImagePlugin - DEBUG - STREAM b'IDAT' 78 286
+2023-12-02 14:05:40,287 -  PIL.PngImagePlugin - DEBUG - STREAM b'IHDR' 16 13
+2023-12-02 14:05:40,288 -  PIL.PngImagePlugin - DEBUG - STREAM b'sBIT' 41 4
+2023-12-02 14:05:40,288 -  PIL.PngImagePlugin - DEBUG - b'sBIT' 41 4 (unknown)
+2023-12-02 14:05:40,288 -  PIL.PngImagePlugin - DEBUG - STREAM b'pHYs' 57 9
+2023-12-02 14:05:40,288 -  PIL.PngImagePlugin - DEBUG - STREAM b'IDAT' 78 263
+2023-12-02 14:05:40,289 -  PIL.PngImagePlugin - DEBUG - STREAM b'IHDR' 16 13
+2023-12-02 14:05:40,289 -  PIL.PngImagePlugin - DEBUG - STREAM b'sBIT' 41 4
+2023-12-02 14:05:40,289 -  PIL.PngImagePlugin - DEBUG - b'sBIT' 41 4 (unknown)
+2023-12-02 14:05:40,289 -  PIL.PngImagePlugin - DEBUG - STREAM b'pHYs' 57 9
+2023-12-02 14:05:40,289 -  PIL.PngImagePlugin - DEBUG - STREAM b'IDAT' 78 387
+2023-12-02 14:05:40,290 -  PIL.PngImagePlugin - DEBUG - STREAM b'IHDR' 16 13
+2023-12-02 14:05:40,290 -  PIL.PngImagePlugin - DEBUG - STREAM b'sBIT' 41 4
+2023-12-02 14:05:40,290 -  PIL.PngImagePlugin - DEBUG - b'sBIT' 41 4 (unknown)
+2023-12-02 14:05:40,290 -  PIL.PngImagePlugin - DEBUG - STREAM b'pHYs' 57 9
+2023-12-02 14:05:40,290 -  PIL.PngImagePlugin - DEBUG - STREAM b'IDAT' 78 436
+2023-12-02 14:05:40,291 -  PIL.PngImagePlugin - DEBUG - STREAM b'IHDR' 16 13
+2023-12-02 14:05:40,291 -  PIL.PngImagePlugin - DEBUG - STREAM b'sBIT' 41 4
+2023-12-02 14:05:40,291 -  PIL.PngImagePlugin - DEBUG - b'sBIT' 41 4 (unknown)
+2023-12-02 14:05:40,291 -  PIL.PngImagePlugin - DEBUG - STREAM b'pHYs' 57 9
+2023-12-02 14:05:40,291 -  PIL.PngImagePlugin - DEBUG - STREAM b'IDAT' 78 351
+2023-12-02 14:05:40,292 -  PIL.PngImagePlugin - DEBUG - STREAM b'IHDR' 16 13
+2023-12-02 14:05:40,292 -  PIL.PngImagePlugin - DEBUG - STREAM b'sBIT' 41 4
+2023-12-02 14:05:40,292 -  PIL.PngImagePlugin - DEBUG - b'sBIT' 41 4 (unknown)
+2023-12-02 14:05:40,292 -  PIL.PngImagePlugin - DEBUG - STREAM b'pHYs' 57 9
+2023-12-02 14:05:40,292 -  PIL.PngImagePlugin - DEBUG - STREAM b'IDAT' 78 364

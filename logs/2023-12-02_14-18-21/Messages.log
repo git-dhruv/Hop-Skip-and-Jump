@@ -1,0 +1,4 @@
+2023-12-02 14:18:21,531 -  root - DEBUG - Initial state at [ 0.     0.95   0.    -0.318  0.635 -0.318  0.635]
+2023-12-02 14:18:21,532 -  root - DEBUG - Jump Height: 0.5, tf: 0.5, 10 knot points
+2023-12-02 14:18:21,533 -  drake - INFO - Meshcat listening for connections at http://localhost:7001
+2023-12-02 14:57:34,111 -  DIRCOL - DEBUG - Starting the solve
