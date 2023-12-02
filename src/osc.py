@@ -9,7 +9,7 @@ Lower level instantaneous QP
 Tracks Desired COM with both feet on ground
 """
 
-import numpy as np
+import numpy as np, logging
 from osc_objective import tracking_objective
 
 from pydrake.multibody.plant import MultibodyPlant
@@ -26,7 +26,7 @@ PREFLIGHT = 0
 FLIGHT = 1
 LAND = 2
 
-
+module_logger = logging.getLogger("OSC")
 class OSC(LeafSystem):
     def __init__(self, urdf, polyTraj=0):
         LeafSystem.__init__(self)
@@ -42,6 +42,7 @@ class OSC(LeafSystem):
         )
         self.plant.Finalize()
         self.plant_context = self.plant.CreateDefaultContext()
+        
 
 
         ## ___________Parameters for tracking___________ ##
@@ -89,6 +90,7 @@ class OSC(LeafSystem):
 
         self.usol = np.zeros((self.plant.num_actuators()))
         self.solutionCost = 0
+        module_logger.debug("Created OSC")
 
     def fetchTrackParams(self):
         ##@TODO: Take FSM as a Class parameter and record the particular objective. Also record the FSM 
@@ -284,7 +286,7 @@ class OSC(LeafSystem):
 
         # If we exceed iteration limits use the previous solution
         if not result.is_success():            
-            print("Solver not working, pal!!!  ", t)
+            module_logger.debug(f"Solver not working, pal! at t:{t}")
             usol = self.usol
         else:
             usol = result.GetSolution(u)                    
