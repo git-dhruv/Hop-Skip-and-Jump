@@ -16,4 +16,10 @@
  - *Diagnosis:* One foot was landed, and not the other.
  - *Solution:* I changed the phase switch definition to any of the foot in contact instead of both. 
 
+## Adjusting gains for torso landing and feet
+
+### Logs: 12-01_23-17 to 12-01_23-54
+
+Idea: Torso angle and torso posotion graph animation
+
  

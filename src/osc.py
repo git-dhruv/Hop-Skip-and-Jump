@@ -51,8 +51,9 @@ class OSC(LeafSystem):
         COMParams = {'Kp': np.diag([60, 0, 60]), 'Kd': 0*np.diag([100, 0, 100])/25 , 'saturations': 50} #Max Lim: 1 G
         COMParams_land = {'Kp': np.diag([600, 0, 600])/2, 'Kd': np.diag([100, 0, 100]) , 'saturations': 50} #Max Lim: 1 G
         TorsoParams = {'Kp': np.diag([0]), 'Kd': np.diag([2]) , 'saturations': 50} #Max Lim: 5 deg/s2
-        TorsoParams_land = {'Kp': np.diag([5.85]), 'Kd': np.diag([2.85]) , 'saturations': 50} #Max Lim: 5 deg/s2
-        footParams = {'Kp': 1700*np.eye(3,3), 'Kd': 30*np.eye(3,3) , 'saturations': 5e5} #Max Lim: 10 m/s2
+        TorsoParams_land = {'Kp': np.diag([5.85*1.5]), 'Kd': np.diag([2.85*1.75]) , 'saturations': 50} #Max Lim: 5 deg/s2
+        footParams = {'Kp': 1700*np.eye(3,3), 'Kd': 0.825*30*np.eye(3,3) , 'saturations': 5e5} #Max Lim: 10 m/s2
+        
         ## Cost Weights ##
         self.WCOM = np.eye(3,3)
         self.WTorso = np.diag([40]) 
@@ -91,6 +92,11 @@ class OSC(LeafSystem):
         self.usol = np.zeros((self.plant.num_actuators()))
         self.solutionCost = 0
         module_logger.debug("Created OSC")
+        module_logger.debug(f"OSC COM Params: {COMParams}")
+        module_logger.debug(f"OSC COMland Params: {COMParams}")
+        module_logger.debug(f"OSC Torso Params: {COMParams}")
+        module_logger.debug(f"OSC Torsoland Params: {COMParams}")
+        module_logger.debug(f"OSC Foot Params: {COMParams}")
 
     def fetchTrackParams(self):
         ##@TODO: Take FSM as a Class parameter and record the particular objective. Also record the FSM 

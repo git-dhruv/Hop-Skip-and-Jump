@@ -119,7 +119,12 @@ def dir_col(N, initial_state, jumpheight, tf, jumpheight_tol=5e-2):
   prog.SetInitialGuess(lambda_c_col, lambda_c_col_init)
 
   logger.debug("Starting the solve")
+  
   prog.SetSolverOption(SolverType.kSnopt, "Major iterations limit", 30000) #30000
+  prog.SetSolverOption(SolverType.kSnopt, "Major feasibility tolerance", 1e-2)
+  prog.SetSolverOption(SolverType.kSnopt, "Minor feasibility tolerance", 1e-2)
+  prog.SetSolverOption(SolverType.kSnopt, "Major optimality tolerance", 1e-4)
+  print("Starting")
   result = Solve(prog)
   
   x_sol = result.GetSolution(x); np.save('x.npy', x_sol)
@@ -133,6 +138,13 @@ def dir_col(N, initial_state, jumpheight, tf, jumpheight_tol=5e-2):
   logger.debug(f'Required Velocity: {required_velocity}')
   logger.debug(f'Achieved Dircol Velocity: {x_sol[-1][n_q+1]}')
   logger.debug(result.get_solution_result())
+
+  print(f'optimal cost: {result.get_optimal_cost()}')
+  print(f'x_sol: {x_sol.round(2)}')
+  print(f'u_sol: {u_sol.round()}' )
+  print(f'Required Velocity: {required_velocity}')
+  print(f'Achieved Dircol Velocity: {x_sol[-1][n_q+1]}')
+  print(result.get_solution_result())
 
   # Reconstruct the trajectory
   xdot_sol = np.zeros(x_sol.shape)
