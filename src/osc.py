@@ -53,8 +53,8 @@ class OSC(LeafSystem):
         COMParams = {'Kp': np.diag([60, 0, 60]), 'Kd': 0.0*np.diag([100, 0, 100])/25 , 'saturations': 50} #Max Lim: 1 G
         COMParams_land = {'Kp': np.diag([600, 0, 600])/2, 'Kd': np.diag([100, 0, 100]) , 'saturations': 50} #Max Lim: 1 G
         TorsoParams = {'Kp': np.diag([0]), 'Kd': np.diag([2]) , 'saturations': 50} #Max Lim: 5 deg/s2
-        TorsoParams_land = {'Kp': np.diag([5.85]), 'Kd': np.diag([2.85]) , 'saturations': 50} #Max Lim: 5 deg/s2
-        footParams = {'Kp': 1700*np.eye(3,3), 'Kd': 0.825*30*np.eye(3,3) , 'saturations': 5e5} #Max Lim: 10 m/s2
+        TorsoParams_land = {'Kp': np.diag([5.85*1.5]), 'Kd': np.diag([2.85*1.75]) , 'saturations': 50} #Max Lim: 5 deg/s2
+        footParams = {'Kp': 1700*np.eye(3,3), 'Kd': 0.925*30*np.eye(3,3) , 'saturations': 5e5} #Max Lim: 10 m/s2
         
         ## Cost Weights ##
         self.WCOM = np.eye(3,3)
@@ -253,7 +253,7 @@ class OSC(LeafSystem):
                 yii = JdotV_i + J_i@vdot
                 qp.AddQuadraticCost( (yddot_cmd_i - yii).T@cost@(yddot_cmd_i - yii) )
 
-        qp.AddQuadraticCost(1e-3*(self.usol-u).T@(self.usol-u) ) #(np.random.random(self.plant.CalcMassMatrix(self.plant_context).shape) - 0.5)
+        # qp.AddQuadraticCost(1e-3*(self.usol-u).T@(self.usol-u) ) #(np.random.random(self.plant.CalcMassMatrix(self.plant_context).shape) - 0.5)
         # Calculate terms in the manipulator equation
         M = self.plant.CalcMassMatrix(self.plant_context)
         Cv = self.plant.CalcBiasTerm(self.plant_context)    
@@ -290,7 +290,11 @@ class OSC(LeafSystem):
         solver = OsqpSolver()
         qp.SetSolverOption(solver.id(), "max_iter", self.max_iter)
         qp.SetSolverOption(solver.id(), "eps_abs", 1e-5)        
-        qp.SetInitialGuess(u, self.dircolUTraj.vector_values([t]).flatten())
+        if self.fsm == PREFLIGHT:
+            uinit = self.dircolUTraj.vector_values([t]).flatten()
+        else:
+            uinit = self.usol
+        qp.SetInitialGuess(u, uinit)
 
         result = solver.Solve(qp)
 

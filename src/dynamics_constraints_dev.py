@@ -167,14 +167,16 @@ def AddCollocationConstraints(prog, robot, context, N, x, u, lambda_c, lambda_c_
 
       mu = 1
       friction_force = lambda x: np.array([mu*x[2]-x[0]-x[1]])
-      frictioncone_constraint1 = friction_force(lambda_c_i[:3]) * gamma_i[:3] #Shape 1
-      frictioncone_constraint2 = friction_force(lambda_c_i[3:]) * gamma_i[3:]
-      frictioncone_constraint3 = friction_force(lambda_c_halfway[:3]) * gamma_halfway[:3]
-      frictioncone_constraint4 = friction_force(lambda_c_halfway[3:]) * gamma_halfway[3:]
+      frictioncone_constraint1 = friction_force(lambda_c_i[:4]) * gamma_i[:3] #Shape 1
+      frictioncone_constraint2 = friction_force(lambda_c_i[4:]) * gamma_i[3:]
+      frictioncone_constraint3 = friction_force(lambda_c_halfway[:4]) * gamma_halfway[:3]
+      frictioncone_constraint4 = friction_force(lambda_c_halfway[4:]) * gamma_halfway[3:]
       frictioncone_constraints = np.concatenate((frictioncone_constraint1, frictioncone_constraint2, frictioncone_constraint3, frictioncone_constraint4))
 
       lambda_x = np.array([lambda_c_i[0],lambda_c_i[0],lambda_c_i[0], lambda_c_i[4], lambda_c_i[4],lambda_c_i[4]])
+      lambda_xm = np.array([lambda_c_i[1],lambda_c_i[1],lambda_c_i[1], lambda_c_i[5], lambda_c_i[5],lambda_c_i[5]])
       lambda_x_halfway = np.array([lambda_c_halfway[0],lambda_c_halfway[0],lambda_c_halfway[0], lambda_c_halfway[4], lambda_c_halfway[4],lambda_c_halfway[4]])
+      lambda_x_halfwaym = np.array([lambda_c_halfway[1],lambda_c_halfway[1],lambda_c_halfway[1], lambda_c_halfway[5], lambda_c_halfway[5],lambda_c_halfway[5]])
       lambda_z = np.array([lambda_c_i[3],lambda_c_i[3],lambda_c_i[3], lambda_c_i[7], lambda_c_i[7],lambda_c_i[7]])
       lambda_z_halfway = np.array([lambda_c_halfway[3],lambda_c_halfway[3],lambda_c_halfway[3], lambda_c_halfway[7], lambda_c_halfway[7],lambda_c_halfway[7]])
       
@@ -188,8 +190,8 @@ def AddCollocationConstraints(prog, robot, context, N, x, u, lambda_c, lambda_c_
 
       additional_constraint1 = (gamma_i+foot_vel_i)@lambda_x
       additional_constraint2 = (gamma_halfway+foot_vel_halfway)@lambda_x_halfway
-      additional_constraint3 = (gamma_i-foot_vel_i)@lambda_x
-      additional_constraint4 = (gamma_halfway-foot_vel_halfway)@lambda_x_halfway
+      additional_constraint3 = (gamma_i-foot_vel_i)@lambda_xm
+      additional_constraint4 = (gamma_halfway-foot_vel_halfway)@lambda_x_halfwaym
       additional_constraints = np.array([additional_constraint1, additional_constraint2, additional_constraint3, additional_constraint4])
 
       return np.concatenate((frictioncone_constraints, slidingfriction_constraints, additional_constraints, lambda_complementaryconstraints))

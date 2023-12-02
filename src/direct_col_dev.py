@@ -114,8 +114,8 @@ def dir_col(N, initial_state, jumpheight, tf, jumpheight_tol=5e-2):
 
   lambda_init = np.zeros((N, 8))
   lambda_c_col_init = np.zeros((N-1, 8))
-  prog.SetInitialGuess(x, np.load('/home/anirudhkailaje/Documents/01_UPenn/02_MEAM5170/03_FinalProject/x.npy'))
-  prog.SetInitialGuess(u, np.load('/home/anirudhkailaje/Documents/01_UPenn/02_MEAM5170/03_FinalProject/u.npy'))
+  # prog.SetInitialGuess(x, np.load('/home/anirudhkailaje/Documents/01_UPenn/02_MEAM5170/03_FinalProject/x.npy'))
+  # prog.SetInitialGuess(u, np.load('/home/anirudhkailaje/Documents/01_UPenn/02_MEAM5170/03_FinalProject/u.npy'))
   prog.SetInitialGuess(lambda_c, lambda_init)
   prog.SetInitialGuess(lambda_c_col, lambda_c_col_init)
   
@@ -123,7 +123,7 @@ def dir_col(N, initial_state, jumpheight, tf, jumpheight_tol=5e-2):
   logger.debug("Starting the solve")
   
   prog.SetSolverOption(SolverType.kSnopt, "Major iterations limit", 30000) #30000
-  prog.SetSolverOption(SolverType.kSnopt, "Minor feasibility tolerance", 1e-2)
+  prog.SetSolverOption(SolverType.kSnopt, "Minor feasibility tolerance", 5e-3)
   # prog.SetSolverOption(SolverType.kSnopt, "Major optimality tolerance", 1e-4)
   
   result = Solve(prog)

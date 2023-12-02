@@ -62,8 +62,8 @@ class PhaseSwitch(LeafSystem):
             leftleg = statePacket['left_leg']
             rightleg = statePacket['right_leg']
 
-            XOffset = 0.16
-            ZOffset = 0.97
+            XOffset = 0.2
+            ZOffset = 0.97*0.85
             if leftleg[0] > rightleg[0]:
                 output.set_value(BasicVector([com[0]+XOffset  , 0 , np.clip(com[-1]-ZOffset,0, np.inf), com[0]-XOffset, 0 , np.clip(com[-1]-ZOffset,0, np.inf)]))
             else:
