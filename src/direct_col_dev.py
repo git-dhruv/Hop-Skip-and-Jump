@@ -121,8 +121,8 @@ def dir_col(N, initial_state, jumpheight, tf, jumpheight_tol=5e-2):
   logger.debug("Starting the solve")
   
   prog.SetSolverOption(SolverType.kSnopt, "Major iterations limit", 30000) #30000
-  prog.SetSolverOption(SolverType.kSnopt, "Minor feasibility tolerance", 1e-3)
-  prog.SetSolverOption(SolverType.kSnopt, "Major optimality tolerance", 1e-4)
+  # prog.SetSolverOption(SolverType.kSnopt, "Minor feasibility tolerance", 1e-3)
+  # prog.SetSolverOption(SolverType.kSnopt, "Major optimality tolerance", 1e-4)
   
   result = Solve(prog)
   

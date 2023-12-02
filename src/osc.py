@@ -81,8 +81,7 @@ class OSC(LeafSystem):
         self.landInput = self.DeclareAbstractInputPort("landing", AbstractValue.Make(BasicVector(3))).get_index()
         self.phaseInput = self.DeclareAbstractInputPort("phase", AbstractValue.Make(BasicVector(1))).get_index()        
         self.torque_output_port = self.DeclareVectorOutputPort("u", self.plant.num_actuators(), self.CalcTorques)
-        # self.u = np.zeros((self.plant.num_actuators()))
-        self.logging_port = self.DeclareVectorOutputPort("logs", BasicVector(40), self.logCB)
+        self.logging_port = self.DeclareVectorOutputPort("logs", BasicVector(46), self.logCB)
 
         self.traj_input_ports = [self.dircolInput, self.flightInput, self.landInput]
 
@@ -92,6 +91,7 @@ class OSC(LeafSystem):
         self.fsm = PREFLIGHT 
 
         self.usol = np.zeros((self.plant.num_actuators()))
+        self.contactForces = np.zeros((6,))
         self.solutionCost = 0
         module_logger.debug("Created OSC")
         module_logger.debug(f"OSC COM Params: {COMParams}")
@@ -157,9 +157,12 @@ class OSC(LeafSystem):
         FSM = x[i[14]:i[15],:]
 
         Torques = x[i[15]:i[16],:]
-        Cost = x[i[16]:,:]
+        Cost = x[i[16]:i[17],:]
+        ContactForces = x[i[17]:,:]
+        LeftContactForces = ContactForces[:3]
+        RightContactForces = ContactForces[3:]
 
-        return COM_POS, COM_VEL, T_POS, T_VEL, LEFT_FOOT, RIGHT_FOOT, COM_POS_DESIRED, COM_VEL_DESIRED, Torso_POS_DESIRED, Torso_VEL_DESIRED, LFt_POS_DESIRED, RFt_POS_DESIRED, FSM, Torques, Cost
+        return COM_POS, COM_VEL, T_POS, T_VEL, LEFT_FOOT, RIGHT_FOOT, COM_POS_DESIRED, COM_VEL_DESIRED, Torso_POS_DESIRED, Torso_VEL_DESIRED, LFt_POS_DESIRED, RFt_POS_DESIRED, FSM, Torques, Cost, LeftContactForces, RightContactForces
         
     def logCB(self, context, output):
         # COM, Torso Angle, Foot pos and velocities
@@ -187,7 +190,9 @@ class OSC(LeafSystem):
         ## Costs ##
         outVector = np.concatenate((outVector, np.diag([self.solutionCost]).flatten()))
         idx.append(outVector.shape[0])
-        
+        ## Contact Forces ##
+        outVector = np.concatenate((outVector, self.contactForces.flatten()))
+        idx.append(outVector.shape[0])
 
         self.log_idx = idx
         output.SetFromVector(outVector)        
@@ -290,6 +295,7 @@ class OSC(LeafSystem):
         result = solver.Solve(qp)
 
         self.solutionCost = result.get_optimal_cost()
+        self.contactForces = result.GetSolution(lambda_c)
 
         # If we exceed iteration limits use the previous solution
         if not result.is_success():            

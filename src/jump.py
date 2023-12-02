@@ -28,7 +28,7 @@ for root, dirs, files in os.walk('../'):
 
 # DIRCOL Parameters #
 N = 10
-jump_height = 0.6
+jump_height = 0.43
 tf = 1/2
 
 # Robot Parameters #
@@ -47,7 +47,7 @@ logging.debug(f"Jump Height: {jump_height}, tf: {tf}, {N} knot points")
 meshcat = StartMeshcat()
 builder = DiagramBuilder()
 plant, scene_graph = AddMultibodyPlantSceneGraph(builder, 0.0005)
-X_WG = HalfSpace.MakePose(np.array([0.1,0, 1]), np.zeros(3,))
+X_WG = HalfSpace.MakePose(np.array([0.0,0, 1]), np.zeros(3,))
 plant.RegisterCollisionGeometry(plant.world_body(), X_WG, HalfSpace(), "collision", CoulombFriction(1.0, 1.0))
 #Make a Geometry of Box shape (Doesnt work with half Space)
 plant.RegisterVisualGeometry(plant.world_body(),X_WG,Box(100, 2, 0.001),"ground_visual",np.array([1.0,0.1,0.1,0.1]))
@@ -151,11 +151,11 @@ import numpy as np
 log = logger.FindLog(simulator.get_mutable_context()) 
 t = log.sample_times()[1:]
 x = log.data()[:,1:]
-COM_POS, COM_VEL, T_POS, T_VEL, left, right, COM_POS_DESIRED, COM_VEL_DESIRED, Torso_POS_DESIRED, Torso_VEL_DESIRED, LFt_POS_DESIRED, RFt_POS_DESIRED, FSM, Torque, Costs =  OSC_Accesor.logParse(x)
+COM_POS, COM_VEL, T_POS, T_VEL, left, right, COM_POS_DESIRED, COM_VEL_DESIRED, Torso_POS_DESIRED, Torso_VEL_DESIRED, LFt_POS_DESIRED, RFt_POS_DESIRED, FSM, Torque, Costs,LeftContactForces, RightContactForces  =  OSC_Accesor.logParse(x)
 
 
 with open(f"./logs/{runstart}/data.pickle", 'wb') as f:
-    data = [COM_POS, COM_VEL, T_POS, T_VEL, left, right, COM_POS_DESIRED, COM_VEL_DESIRED, Torso_POS_DESIRED, Torso_VEL_DESIRED, LFt_POS_DESIRED, RFt_POS_DESIRED, FSM, Torque, Costs, t]
+    data = [COM_POS, COM_VEL, T_POS, T_VEL, left, right, COM_POS_DESIRED, COM_VEL_DESIRED, Torso_POS_DESIRED, Torso_VEL_DESIRED, LFt_POS_DESIRED, RFt_POS_DESIRED, FSM, Torque, Costs, t, LeftContactForces, RightContactForces]
     for i, datum in enumerate(data):
         data[i] = np.float32(datum.round(3))
     pickle.dump(tuple(data), f)
@@ -179,7 +179,7 @@ def plot_3d_data(ax, t, data, label, linestyle='-', alpha=0.1):
         ax.axvspan(t[start_idx], t[end_idx], color=colors[FSM[0, start_idx]], alpha=alpha, lw=0)
 
 # Create subplots
-fig, axs = plt.subplots(8, 1, figsize=(7, 20))
+fig, axs = plt.subplots(10, 1, figsize=(7, 20))
 
 # Plotting each pair of actual and desired values
 plot_3d_data(axs[0], t, COM_POS, 'COM_POS', alpha=0.1)
@@ -236,6 +236,11 @@ for i in range(0, len(boundaries)-1):
     axs[7].axvspan(t[start_idx], t[end_idx], color=colors[FSM[0, start_idx]], alpha=0.1, lw=0)
 axs[7].set_title('Torques')
 axs[7].legend(loc='upper right')
+
+plot_3d_data(axs[8], t, LeftContactForces, 'Left Contact Forces', alpha=1)
+axs[8].set_title('Left Contact Forces')
+plot_3d_data(axs[9], t, RightContactForces, 'Right Contact Forces', alpha=1)
+axs[9].set_title('Right Contact Forces')
 
 
 # Set common labels and title

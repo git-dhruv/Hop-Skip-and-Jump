@@ -3,10 +3,18 @@ import matplotlib.pyplot as plt
 import pickle
 from os.path import join as opj
 
-folder_location = r"/home/dhruv/Hop-Skip-and-Jump/logs/2023-12-02_12-43-27"
+folder_location = r"/home/dhruv/Hop-Skip-and-Jump/logs/2023-12-02_13-44-57"
 with open(opj(folder_location, "data.pickle"), "rb") as file:
-    COM_POS, COM_VEL, T_POS, T_VEL, left, right, COM_POS_DESIRED, COM_VEL_DESIRED, Torso_POS_DESIRED, Torso_VEL_DESIRED, LFt_POS_DESIRED, RFt_POS_DESIRED, FSM, Torque, Costs, t = pickle.load(file)
+    COM_POS, COM_VEL, T_POS, T_VEL, left, right, COM_POS_DESIRED, COM_VEL_DESIRED, Torso_POS_DESIRED, Torso_VEL_DESIRED, LFt_POS_DESIRED, RFt_POS_DESIRED, FSM, Torque, Costs, t, LContact, RContact = pickle.load(file)
 FSM = np.int32(FSM)
+print(FSM.shape)
+
+fig, axs = plt.subplots(2, 1, figsize=(7, 10))
+axs[0].imshow(np.row_stack((RContact,LContact))[:,500:1000]  )
+axs[1].plot(FSM[0,500:1000]  )
+plt.show()
+
+
 
 colors = ['skyblue', 'lightcoral', 'lightgreen']
 # Find boundaries where the finite state changes
