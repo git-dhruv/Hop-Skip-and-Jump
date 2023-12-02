@@ -4,3 +4,4 @@ bashwsl.bash
 src/logs/*
 *pycache*
 *svg*
+*logs*

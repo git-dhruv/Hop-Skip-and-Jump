@@ -82,8 +82,8 @@ def dir_col(N, initial_state, jumpheight, tf, jumpheight_tol=5e-2):
        
        if i>=N-3:
         prog.AddLinearConstraint(x[i+1][n_q+1] - x[i][n_q+1] , -9, 30)
-        #Adding costs for angular momentum
-        # AddAngularMomentumConstraint(prog, robot, context, x[i], 1)
+        # Adding costs for angular momentum
+        # AddAngularMomentumConstraint(prog, robot, context, x[i], 1000000)
        else:
         prog.AddLinearConstraint(x[i+1][n_q+1] - x[i][n_q+1], -20, 9)
         prog.AddLinearConstraint(x[i][n_q] - x[i+1][n_q], -.01, .01)        
@@ -121,16 +121,14 @@ def dir_col(N, initial_state, jumpheight, tf, jumpheight_tol=5e-2):
   logger.debug("Starting the solve")
   
   prog.SetSolverOption(SolverType.kSnopt, "Major iterations limit", 30000) #30000
-  prog.SetSolverOption(SolverType.kSnopt, "Major feasibility tolerance", 1e-2)
-  prog.SetSolverOption(SolverType.kSnopt, "Minor feasibility tolerance", 1e-2)
+  prog.SetSolverOption(SolverType.kSnopt, "Minor feasibility tolerance", 1e-3)
   prog.SetSolverOption(SolverType.kSnopt, "Major optimality tolerance", 1e-4)
-  print("Starting")
+  
   result = Solve(prog)
   
-  x_sol = result.GetSolution(x); np.save('x.npy', x_sol)
-  u_sol = result.GetSolution(u); np.save('u.npy', u_sol)
+  x_sol = result.GetSolution(x); 
+  u_sol = result.GetSolution(u); 
   lambda_sol = result.GetSolution(lambda_c)
-
 
   logger.debug(f'optimal cost: {result.get_optimal_cost()}')
   logger.debug(f'x_sol: {x_sol.round(2)}')
@@ -154,7 +152,7 @@ def dir_col(N, initial_state, jumpheight, tf, jumpheight_tol=5e-2):
   x_traj = PiecewisePolynomial.CubicHermite(timesteps, x_sol.T, xdot_sol.T)
   u_traj = PiecewisePolynomial.ZeroOrderHold(timesteps, u_sol.T)
 
-  return x_traj, u_traj, prog, prog.GetInitialGuess(x), prog.GetInitialGuess(u)
+  return x_traj, u_traj, prog, x_sol, u_sol
   
 if __name__ == '__main__':
   N = 3
