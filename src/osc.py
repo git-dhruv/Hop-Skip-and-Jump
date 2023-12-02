@@ -292,7 +292,6 @@ class OSC(LeafSystem):
         self.solutionCost = result.get_optimal_cost()
 
         # If we exceed iteration limits use the previous solution
-        module_logger.debug(f"States at t:{t} = {x}")
         if not result.is_success():            
             module_logger.debug(f"Solver not working, pal! at t:{t}")            
             usol = self.usol
