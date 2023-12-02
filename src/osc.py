@@ -28,7 +28,7 @@ LAND = 2
 
 module_logger = logging.getLogger("OSC")
 class OSC(LeafSystem):
-    def __init__(self, urdf, polyTraj=0):
+    def __init__(self, urdf, utraj = None):
         LeafSystem.__init__(self)
 
         ### Internal Plant Model for simulation ###
@@ -42,16 +42,18 @@ class OSC(LeafSystem):
         )
         self.plant.Finalize()
         self.plant_context = self.plant.CreateDefaultContext()
+
+        self.dircolUTraj = utraj
         
 
 
         ## ___________Parameters for tracking___________ ##
         self.whatToTrack = [['COM', 'torso'],['foot'],['COM', 'torso']]
         
-        COMParams = {'Kp': np.diag([60, 0, 60]), 'Kd': 0*np.diag([100, 0, 100])/25 , 'saturations': 50} #Max Lim: 1 G
+        COMParams = {'Kp': np.diag([60, 0, 60]), 'Kd': 0.0*np.diag([100, 0, 100])/25 , 'saturations': 50} #Max Lim: 1 G
         COMParams_land = {'Kp': np.diag([600, 0, 600])/2, 'Kd': np.diag([100, 0, 100]) , 'saturations': 50} #Max Lim: 1 G
         TorsoParams = {'Kp': np.diag([0]), 'Kd': np.diag([2]) , 'saturations': 50} #Max Lim: 5 deg/s2
-        TorsoParams_land = {'Kp': np.diag([5.85*1.5]), 'Kd': np.diag([2.85*1.75]) , 'saturations': 50} #Max Lim: 5 deg/s2
+        TorsoParams_land = {'Kp': np.diag([5.85]), 'Kd': np.diag([2.85]) , 'saturations': 50} #Max Lim: 5 deg/s2
         footParams = {'Kp': 1700*np.eye(3,3), 'Kd': 0.825*30*np.eye(3,3) , 'saturations': 5e5} #Max Lim: 10 m/s2
         
         ## Cost Weights ##
@@ -79,7 +81,7 @@ class OSC(LeafSystem):
         self.landInput = self.DeclareAbstractInputPort("landing", AbstractValue.Make(BasicVector(3))).get_index()
         self.phaseInput = self.DeclareAbstractInputPort("phase", AbstractValue.Make(BasicVector(1))).get_index()        
         self.torque_output_port = self.DeclareVectorOutputPort("u", self.plant.num_actuators(), self.CalcTorques)
-        self.u = np.zeros((self.plant.num_actuators()))
+        # self.u = np.zeros((self.plant.num_actuators()))
         self.logging_port = self.DeclareVectorOutputPort("logs", BasicVector(40), self.logCB)
 
         self.traj_input_ports = [self.dircolInput, self.flightInput, self.landInput]
@@ -246,8 +248,7 @@ class OSC(LeafSystem):
                 yii = JdotV_i + J_i@vdot
                 qp.AddQuadraticCost( (yddot_cmd_i - yii).T@cost@(yddot_cmd_i - yii) )
 
-        # qp.AddQuadraticCost(1e-1*(self.u-u).T@(self.u-u) ) (np.random.random(self.plant.CalcMassMatrix(self.plant_context).shape) - 0.5)
-        Perturbation_Scale = 0.5
+        qp.AddQuadraticCost(1e-3*(self.usol-u).T@(self.usol-u) ) #(np.random.random(self.plant.CalcMassMatrix(self.plant_context).shape) - 0.5)
         # Calculate terms in the manipulator equation
         M = self.plant.CalcMassMatrix(self.plant_context)
         Cv = self.plant.CalcBiasTerm(self.plant_context)    
@@ -278,21 +279,22 @@ class OSC(LeafSystem):
             qp.AddLinearEqualityConstraint(M@vdot + Cv + G - B@u, np.zeros((7,)))
 
         for i in range(len(u)):
-            qp.AddLinearConstraint(u[i], np.array([-1000]), np.array([1000]))
+            qp.AddLinearConstraint(u[i], np.array([-1200]), np.array([1200]))
 
         # Solve the QP
         solver = OsqpSolver()
         qp.SetSolverOption(solver.id(), "max_iter", self.max_iter)
-        qp.SetSolverOption(solver.id(), "eps_abs", 1e-5)
-        qp.SetInitialGuess(u, self.u)
+        qp.SetSolverOption(solver.id(), "eps_abs", 1e-5)        
+        qp.SetInitialGuess(u, self.dircolUTraj.vector_values([t]).flatten())
 
         result = solver.Solve(qp)
 
         self.solutionCost = result.get_optimal_cost()
 
         # If we exceed iteration limits use the previous solution
+        module_logger.debug(f"States at t:{t} = {x}")
         if not result.is_success():            
-            module_logger.debug(f"Solver not working, pal! at t:{t}")
+            module_logger.debug(f"Solver not working, pal! at t:{t}")            
             usol = self.usol
         else:
             usol = result.GetSolution(u)                    
