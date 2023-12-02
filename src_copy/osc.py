@@ -51,7 +51,7 @@ class OSC(LeafSystem):
         COMParams_land = {'Kp': np.diag([600, 0, 600])/2, 'Kd': np.diag([100, 0, 100]) , 'saturations': 50} #Max Lim: 1 G
         TorsoParams = {'Kp': np.diag([0]), 'Kd': np.diag([2]) , 'saturations': 50} #Max Lim: 5 deg/s2
         TorsoParams_land = {'Kp': np.diag([5.85]), 'Kd': np.diag([2.85]) , 'saturations': 50} #Max Lim: 5 deg/s2
-        footParams = {'Kp': 700*np.eye(3,3), 'Kd': 30*np.eye(3,3) , 'saturations': 5e5} #Max Lim: 10 m/s2
+        footParams = {'Kp': 1700*np.eye(3,3), 'Kd': 30*np.eye(3,3) , 'saturations': 5e5} #Max Lim: 10 m/s2
         ## Cost Weights ##
         self.WCOM = np.eye(3,3)
         self.WTorso = np.diag([40]) 
