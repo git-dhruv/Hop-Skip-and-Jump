@@ -4,26 +4,6 @@ import pydrake.math
 from pydrake.autodiffutils import AutoDiffXd
 from utils import *
 
-def get_foot_pos(context, plant):
-    contact_points = {
-    0: PointOnFrame(
-        plant.GetBodyByName("left_lower_leg").body_frame(),
-        np.array([0, 0, -0.5])
-    ),
-    1: PointOnFrame(
-        plant.GetBodyByName("right_lower_leg").body_frame(),
-        np.array([0, 0, -0.5])
-    )
-    }
-    ft = np.zeros((3,2))
-    i =0
-    for fsm in [0,1]:
-        pt_to_track = contact_points[fsm]
-        ft[:,i] = plant.CalcPointsPositions(context, pt_to_track.frame,
-                                        pt_to_track.pt, plant.world_frame()).ravel()
-        i+=1
-    return ft    
-
 def CalculateContactJacobian( fsm: int, plant,plant_context) :
     """
         For a given finite state, LEFT_STANCE or RIGHT_STANCE, calculate the
@@ -61,23 +41,22 @@ def CalculateContactJacobian( fsm: int, plant,plant_context) :
 
     return J, JdotV
 
-def EvaluateDynamics(planar_arm, context, x, u, lambda_c):
+def EvaluateDynamics(robot, context, x, u, lambda_c):
   # Computes the dynamics xdot = f(x,u)
 
-  planar_arm.SetPositionsAndVelocities(context, x)
-  n_v = planar_arm.num_velocities()
+  robot.SetPositionsAndVelocities(context, x)
+  n_v = robot.num_velocities()
 
-  M = planar_arm.CalcMassMatrixViaInverseDynamics(context)
-  B = planar_arm.MakeActuationMatrix()
-  g = planar_arm.CalcGravityGeneralizedForces(context)
-  C = planar_arm.CalcBiasTerm(context)
+  M = robot.CalcMassMatrixViaInverseDynamics(context)
+  B = robot.MakeActuationMatrix()
+  g = robot.CalcGravityGeneralizedForces(context)
+  C = robot.CalcBiasTerm(context)
 
-  J_c, J_c_dot_v = CalculateContactJacobian(0, planar_arm, context)
-  J_c_2, J_c_dot_v_2 = CalculateContactJacobian(1,planar_arm, context)
+  J_c, J_c_dot_v = CalculateContactJacobian(0, robot, context)
+  J_c_2, J_c_dot_v_2 = CalculateContactJacobian(1,robot, context)
   J_c = np.row_stack((J_c, J_c_2))
   J_c_dot_v = np.row_stack((J_c_dot_v.reshape(-1,1), J_c_dot_v_2.reshape(-1,1)))
   
-
   M_inv = np.zeros((n_v,n_v)) 
   if(x.dtype == AutoDiffXd):
     M_inv = pydrake.math.inv(M)
@@ -87,28 +66,25 @@ def EvaluateDynamics(planar_arm, context, x, u, lambda_c):
   contact_force = np.array([lambda_c[0]-lambda_c[1], lambda_c[2], lambda_c[3], lambda_c[4]-lambda_c[5], lambda_c[6], lambda_c[7]])
   v_dot = M_inv @ (B @ u + g - C + J_c.T@contact_force)
   
-  state = fetchStates(context=context, plant=planar_arm)
+  state = fetchStates(context=context, plant=robot)
   foot = np.concatenate((state['left_leg'], state['right_leg']))
   foot_vel = np.concatenate((state['leftVel'],state['rightVel']))
-
- 
 
   return np.hstack((x[-n_v:], v_dot)), foot, foot_vel
 
 
-def CollocationConstraintEvaluator(planar_arm, context, dt, x_i, u_i, x_ip1, u_ip1, lambda_c_i, lambda_c_ip1, lambda_c_halfway):
-  n_x = planar_arm.num_positions() + planar_arm.num_velocities()
+def CollocationConstraintEvaluator(robot, context, dt, x_i, u_i, x_ip1, u_ip1, lambda_c_i, lambda_c_ip1, lambda_c_halfway):
+  n_x = robot.num_positions() + robot.num_velocities()
   h_i = np.zeros(n_x,)
-  # TODO: Add a dynamics constraint using x_i, u_i, x_ip1, u_ip1, dt
-  # You should make use of the EvaluateDynamics() function to compute f(x,u)
-  fi,foot_i ,foot_vel_i= EvaluateDynamics(planar_arm, context, x_i, u_i, lambda_c_i)
-  fi1, foot_i1, foot_vel_i1 = EvaluateDynamics(planar_arm, context, x_ip1, u_ip1, lambda_c_ip1)
+  """Adding dynamics constraint using x_i, u_i, x_ip1, u_ip1, dt """
+  fi,foot_i ,foot_vel_i= EvaluateDynamics(robot, context, x_i, u_i, lambda_c_i)
+  fi1, foot_i1, foot_vel_i1 = EvaluateDynamics(robot, context, x_ip1, u_ip1, lambda_c_ip1)
 
   s_halfway = (x_i+x_ip1)*0.5 - 0.125*(dt)*(fi1-fi)
   sdot_halfway = 1.5*(x_ip1-x_i)/dt - 0.25*(fi+fi1)
   u_halfway = (u_i+u_ip1)*0.5
 
-  dyn, foot_halfway, foot_vel_halfway = EvaluateDynamics(planar_arm, context, s_halfway, u_halfway, lambda_c_halfway)
+  dyn, foot_halfway, foot_vel_halfway = EvaluateDynamics(robot, context, s_halfway, u_halfway, lambda_c_halfway)
   h_i = sdot_halfway - dyn
 
   feet_pos = np.concatenate((foot_i, foot_halfway, foot_i1))
@@ -116,16 +92,12 @@ def CollocationConstraintEvaluator(planar_arm, context, dt, x_i, u_i, x_ip1, u_i
   
   return h_i, feet_pos, feet_vel
 
-def AddCollocationConstraints(prog, planar_arm, context, N, x, u, lambda_c, lambda_c_col, gamma, gamma_col, timesteps):
-  n_u = planar_arm.num_actuators()
-  n_x = planar_arm.num_positions() + planar_arm.num_velocities()
+def AddCollocationConstraints(prog, robot, context, N, x, u, lambda_c, lambda_c_col, gamma, gamma_col, timesteps):
+  n_u = robot.num_actuators()
+  n_x = robot.num_positions() + robot.num_velocities()
   n_lambda = 6
 
   for i in range(N - 1):
-    # TODO: Within this loop add the dynamics constraints for segment i (aka collocation constraints)
-    #       to prog
-    # Hint: use prog.AddConstraint(CollocationConstraintHelper, lb, ub, vars)
-    # where vars = hstack(x[i], u[i], ...)
     lower_bound = np.zeros(n_x)
     upper_bound = lower_bound
     eps = 1e-4
@@ -144,7 +116,7 @@ def AddCollocationConstraints(prog, planar_arm, context, N, x, u, lambda_c, lamb
       gamma_i1 = vars[2*(n_x+n_u)+30:2*(n_x+n_u)+36]
       gamma_halfway = vars[2*(n_x+n_u)+36:]
 
-      return CollocationConstraintEvaluator(planar_arm, context, timesteps[i+1] - timesteps[i], x_i, u_i, x_ip1, u_ip1, lambda_c_i, lambda_c_ip1, lambda_c_halfway)[0]
+      return CollocationConstraintEvaluator(robot, context, timesteps[i+1] - timesteps[i], x_i, u_i, x_ip1, u_ip1, lambda_c_i, lambda_c_ip1, lambda_c_halfway)[0]
 
     def CollocationConstraintHelper_2(vars):
       x_i = vars[:n_x]
@@ -158,7 +130,7 @@ def AddCollocationConstraints(prog, planar_arm, context, N, x, u, lambda_c, lamb
       gamma_i1 = vars[2*(n_x+n_u)+30:2*(n_x+n_u)+36]
       gamma_halfway = vars[2*(n_x+n_u)+36:]
 
-      return CollocationConstraintEvaluator(planar_arm, context, timesteps[i+1] - timesteps[i], x_i, u_i, x_ip1, u_ip1, lambda_c_i, lambda_c_ip1, lambda_c_halfway)[1]
+      return CollocationConstraintEvaluator(robot, context, timesteps[i+1] - timesteps[i], x_i, u_i, x_ip1, u_ip1, lambda_c_i, lambda_c_ip1, lambda_c_halfway)[1]
 
     def CollocationConstraintHelper_3(vars):
       x_i = vars[:n_x]
@@ -172,8 +144,7 @@ def AddCollocationConstraints(prog, planar_arm, context, N, x, u, lambda_c, lamb
       gamma_i1 = vars[2*(n_x+n_u)+30:2*(n_x+n_u)+36]
       gamma_halfway = vars[2*(n_x+n_u)+36:]
 
-      feet_vel = CollocationConstraintEvaluator(planar_arm, context, timesteps[i+1] - timesteps[i], x_i, u_i, x_ip1, u_ip1, lambda_c_i, lambda_c_ip1, lambda_c_halfway)[2]
-      #feet_vel = np.concatenate((foot_vel_i, foot_vel_halfway, foot_vel_i1))
+      feet_vel = CollocationConstraintEvaluator(robot, context, timesteps[i+1] - timesteps[i], x_i, u_i, x_ip1, u_ip1, lambda_c_i, lambda_c_ip1, lambda_c_halfway)[2]
       foot_vel_i = feet_vel[:6]; foot_vel_halfway = feet_vel[6:12]
 
       slack_constraint = np.concatenate((gamma_i-foot_vel_i, gamma_halfway-foot_vel_halfway))
@@ -191,8 +162,7 @@ def AddCollocationConstraints(prog, planar_arm, context, N, x, u, lambda_c, lamb
       gamma_i1 = vars[2*(n_x+n_u)+30:2*(n_x+n_u)+36]
       gamma_halfway = vars[2*(n_x+n_u)+36:]
 
-      feet_pos, feet_vel = CollocationConstraintEvaluator(planar_arm, context, timesteps[i+1] - timesteps[i], x_i, u_i, x_ip1, u_ip1, lambda_c_i, lambda_c_ip1, lambda_c_halfway)[1:]
-      #feet_vel = np.concatenate((foot_vel_i, foot_vel_halfway, foot_vel_i1))
+      feet_pos, feet_vel = CollocationConstraintEvaluator(robot, context, timesteps[i+1] - timesteps[i], x_i, u_i, x_ip1, u_ip1, lambda_c_i, lambda_c_ip1, lambda_c_halfway)[1:]
       foot_vel_i = feet_vel[:6]; foot_vel_halfway = feet_vel[6:12]
 
       mu = 1
@@ -231,3 +201,13 @@ def AddCollocationConstraints(prog, planar_arm, context, N, x, u, lambda_c, lamb
     prog.AddConstraint(CollocationConstraintHelper_3, np.zeros(12), np.zeros(12),np.hstack([x[i], x[i+1], u[i], u[i+1], lambda_c[i], lambda_c[i+1], lambda_c_col[i], gamma[i], gamma[i+1], gamma_col[i]]))
     prog.AddConstraint(CollocationConstraintHelper_4, np.zeros((20,1)), np.zeros((20,1)),np.hstack([x[i], x[i+1], u[i], u[i+1], lambda_c[i], lambda_c[i+1], lambda_c_col[i], gamma[i], gamma[i+1], gamma_col[i]]))
 
+def AddAngularMomentumConstraint(prog, robot, context, x, Lthd):
+
+  def AngularMomentumHelper(vars):
+    x = vars
+    base_point = robot.CalcPointsPositions(context, robot.GetFrameByName("base"), np.array([0,0,0]), robot.world_frame())
+    L = robot.CalcSpatialMomentumInWorldAboutPoint(context, base_point).rotational().ravel()
+    return L
+
+  prog.AddConstraint(AngularMomentumHelper, np.zeros(3)-Lthd/2, np.zeros(3)+Lthd/2, x)  
+  

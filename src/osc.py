@@ -9,7 +9,7 @@ Lower level instantaneous QP
 Tracks Desired COM with both feet on ground
 """
 
-import numpy as np
+import numpy as np, logging
 from osc_objective import tracking_objective
 
 from pydrake.multibody.plant import MultibodyPlant
@@ -26,7 +26,7 @@ PREFLIGHT = 0
 FLIGHT = 1
 LAND = 2
 
-
+module_logger = logging.getLogger("OSC")
 class OSC(LeafSystem):
     def __init__(self, urdf, polyTraj=0):
         LeafSystem.__init__(self)
@@ -42,16 +42,18 @@ class OSC(LeafSystem):
         )
         self.plant.Finalize()
         self.plant_context = self.plant.CreateDefaultContext()
+        
 
 
         ## ___________Parameters for tracking___________ ##
         self.whatToTrack = [['COM', 'torso'],['foot'],['COM', 'torso']]
         
         COMParams = {'Kp': np.diag([60, 0, 60]), 'Kd': 0*np.diag([100, 0, 100])/25 , 'saturations': 50} #Max Lim: 1 G
-        COMParams_land = {'Kp': np.diag([600, 0, 600]), 'Kd': np.diag([100, 0, 100]) , 'saturations': 50} #Max Lim: 1 G
+        COMParams_land = {'Kp': np.diag([600, 0, 600])/2, 'Kd': np.diag([100, 0, 100]) , 'saturations': 50} #Max Lim: 1 G
         TorsoParams = {'Kp': np.diag([0]), 'Kd': np.diag([2]) , 'saturations': 50} #Max Lim: 5 deg/s2
-        TorsoParams_land = {'Kp': np.diag([5.85]), 'Kd': np.diag([2.85]) , 'saturations': 50} #Max Lim: 5 deg/s2
-        footParams = {'Kp': 170*np.eye(3,3), 'Kd': 30*np.eye(3,3) , 'saturations': 5e5} #Max Lim: 10 m/s2
+        TorsoParams_land = {'Kp': np.diag([5.85*1.5]), 'Kd': np.diag([2.85*1.75]) , 'saturations': 50} #Max Lim: 5 deg/s2
+        footParams = {'Kp': 1700*np.eye(3,3), 'Kd': 0.825*30*np.eye(3,3) , 'saturations': 5e5} #Max Lim: 10 m/s2
+        
         ## Cost Weights ##
         self.WCOM = np.eye(3,3)
         self.WTorso = np.diag([40]) 
@@ -78,7 +80,7 @@ class OSC(LeafSystem):
         self.phaseInput = self.DeclareAbstractInputPort("phase", AbstractValue.Make(BasicVector(1))).get_index()        
         self.torque_output_port = self.DeclareVectorOutputPort("u", self.plant.num_actuators(), self.CalcTorques)
         self.u = np.zeros((self.plant.num_actuators()))
-        self.logging_port = self.DeclareVectorOutputPort("logs", BasicVector(35), self.logCB)
+        self.logging_port = self.DeclareVectorOutputPort("logs", BasicVector(40), self.logCB)
 
         self.traj_input_ports = [self.dircolInput, self.flightInput, self.landInput]
 
@@ -86,6 +88,15 @@ class OSC(LeafSystem):
 
         self.idx = None; self.inAir = 0;
         self.fsm = PREFLIGHT 
+
+        self.usol = np.zeros((self.plant.num_actuators()))
+        self.solutionCost = 0
+        module_logger.debug("Created OSC")
+        module_logger.debug(f"OSC COM Params: {COMParams}")
+        module_logger.debug(f"OSC COMland Params: {COMParams}")
+        module_logger.debug(f"OSC Torso Params: {COMParams}")
+        module_logger.debug(f"OSC Torsoland Params: {COMParams}")
+        module_logger.debug(f"OSC Foot Params: {COMParams}")
 
     def fetchTrackParams(self):
         ##@TODO: Take FSM as a Class parameter and record the particular objective. Also record the FSM 
@@ -141,8 +152,12 @@ class OSC(LeafSystem):
         Torso_VEL_DESIRED = x[i[11]:i[12],:]
         LFt_POS_DESIRED = x[i[12]:i[13],:]
         RFt_POS_DESIRED = x[i[13]:i[14],:]
-        FSM = x[i[14]:,:]
-        return COM_POS, COM_VEL, T_POS, T_VEL, LEFT_FOOT, RIGHT_FOOT, COM_POS_DESIRED, COM_VEL_DESIRED, Torso_POS_DESIRED, Torso_VEL_DESIRED, LFt_POS_DESIRED, RFt_POS_DESIRED, FSM
+        FSM = x[i[14]:i[15],:]
+
+        Torques = x[i[15]:i[16],:]
+        Cost = x[i[16]:,:]
+
+        return COM_POS, COM_VEL, T_POS, T_VEL, LEFT_FOOT, RIGHT_FOOT, COM_POS_DESIRED, COM_VEL_DESIRED, Torso_POS_DESIRED, Torso_VEL_DESIRED, LFt_POS_DESIRED, RFt_POS_DESIRED, FSM, Torques, Cost
         
     def logCB(self, context, output):
         # COM, Torso Angle, Foot pos and velocities
@@ -163,7 +178,15 @@ class OSC(LeafSystem):
         for _, value in trackPacket.items():
             outVector = np.concatenate((outVector, value.flatten()))
             idx.append(outVector.shape[0])
+
+        ## Torque Outputs ##        
+        outVector = np.concatenate((outVector, self.usol.flatten()))
+        idx.append(outVector.shape[0])
+        ## Costs ##
+        outVector = np.concatenate((outVector, np.diag([self.solutionCost]).flatten()))
+        idx.append(outVector.shape[0])
         
+
         self.log_idx = idx
         output.SetFromVector(outVector)        
 
@@ -255,7 +278,7 @@ class OSC(LeafSystem):
             qp.AddLinearEqualityConstraint(M@vdot + Cv + G - B@u, np.zeros((7,)))
 
         for i in range(len(u)):
-            qp.AddLinearConstraint(u[i], np.array([-1400]), np.array([1400]))
+            qp.AddLinearConstraint(u[i], np.array([-1000]), np.array([1000]))
 
         # Solve the QP
         solver = OsqpSolver()
@@ -265,14 +288,16 @@ class OSC(LeafSystem):
 
         result = solver.Solve(qp)
 
+        self.solutionCost = result.get_optimal_cost()
+
         # If we exceed iteration limits use the previous solution
         if not result.is_success():            
-            print("Solver not working, pal!!!  ", t)
-            usol = self.u/10
+            module_logger.debug(f"Solver not working, pal! at t:{t}")
+            usol = self.usol
         else:
             usol = result.GetSolution(u)                    
-        if  np.linalg.norm(usol)>1400:
-            usol = 1400*usol/np.linalg.norm(usol)
+        if  np.linalg.norm(usol)>1000:
+            usol = 1000*usol/np.linalg.norm(usol)
         return usol
 
     ## Ignore ##
