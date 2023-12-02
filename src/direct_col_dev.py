@@ -83,7 +83,7 @@ def dir_col(N, initial_state, jumpheight, tf, jumpheight_tol=5e-2):
        if i>=N-3:
         prog.AddLinearConstraint(x[i+1][n_q+1] - x[i][n_q+1] , -9, 30)
         # Adding costs for angular momentum
-        # AddAngularMomentumConstraint(prog, robot, context, x[i], 1000000)
+        AddAngularMomentumConstraint(prog, robot, context, x[i], 1)
        else:
         prog.AddLinearConstraint(x[i+1][n_q+1] - x[i][n_q+1], -20, 9)
         prog.AddLinearConstraint(x[i][n_q] - x[i+1][n_q], -.01, .01)        
@@ -114,14 +114,16 @@ def dir_col(N, initial_state, jumpheight, tf, jumpheight_tol=5e-2):
 
   lambda_init = np.zeros((N, 8))
   lambda_c_col_init = np.zeros((N-1, 8))
-  
+  prog.SetInitialGuess(x, np.load('/home/anirudhkailaje/Documents/01_UPenn/02_MEAM5170/03_FinalProject/x.npy'))
+  prog.SetInitialGuess(u, np.load('/home/anirudhkailaje/Documents/01_UPenn/02_MEAM5170/03_FinalProject/u.npy'))
   prog.SetInitialGuess(lambda_c, lambda_init)
   prog.SetInitialGuess(lambda_c_col, lambda_c_col_init)
+  
 
   logger.debug("Starting the solve")
   
   prog.SetSolverOption(SolverType.kSnopt, "Major iterations limit", 30000) #30000
-  # prog.SetSolverOption(SolverType.kSnopt, "Minor feasibility tolerance", 1e-3)
+  prog.SetSolverOption(SolverType.kSnopt, "Minor feasibility tolerance", 1e-2)
   # prog.SetSolverOption(SolverType.kSnopt, "Major optimality tolerance", 1e-4)
   
   result = Solve(prog)

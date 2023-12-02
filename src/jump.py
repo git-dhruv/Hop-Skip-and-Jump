@@ -12,6 +12,12 @@ from pydrake.geometry import Box
 runstart = datetime.datetime.now().strftime('%Y-%m-%d_%H-%M-%S')
 file_name = None
 
+if not 'src' in os.getcwd():
+    for (root, dir, files) in os.walk(os.getcwd()):
+        if 'src' in dir:
+            os.chdir(os.path.join(root, 'src'))
+            break
+
 folders = ['./logs', './report', f'./logs/{runstart}']
 for folder in folders:
     if not os.path.exists(folder):
@@ -28,7 +34,7 @@ for root, dirs, files in os.walk('../'):
 
 # DIRCOL Parameters #
 N = 10
-jump_height = 0.43
+jump_height = 0.5
 tf = 1/2
 
 # Robot Parameters #
@@ -145,8 +151,6 @@ ani = visualizer.get_recording_as_animation()
 ani.save(f"./logs/{runstart}/result.gif", fps=30)
 
 # %%
-import matplotlib.pyplot as plt
-import numpy as np
 
 log = logger.FindLog(simulator.get_mutable_context()) 
 t = log.sample_times()[1:]
