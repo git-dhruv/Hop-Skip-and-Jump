@@ -20,6 +20,10 @@
 
 ### Logs: 12-01_23-17 to 12-01_23-54
 
+### Logs: 12-01_23-17 to 12-01_23-54, Branch: ablation-studies, commit: 449ed1f..4d48023, Anirudh's PC
+
 Idea: Torso angle and torso posotion graph animation
+
+## Trying out contact implicit OSC
 
  

@@ -207,7 +207,8 @@ class OSC(LeafSystem):
         qp = MathematicalProgram()
         u = qp.NewContinuousVariables(self.plant.num_actuators(), "u")
         vdot = qp.NewContinuousVariables(self.plant.num_velocities(), "vdot")
-        lambda_c = qp.NewContinuousVariables(6, "lambda_c")
+        lambda_c = qp.NewContinuousVariables(8, "lambda_c")
+        gamma = qp.NewContinuousVariables(6, "gamma")
 
         ## Quadratic Costs ##
         whatToTrack = self.whatToTrack[self.fsm]
@@ -258,6 +259,23 @@ class OSC(LeafSystem):
 
         #Calculate Contact Jacobians
         if self.fsm != FLIGHT:
+            statePacket = fetchStates(self.plant_context, self.plant)
+            qp.AddLinearConstraint(statePacket['left_leg'], 0, np.inf) #Eq 8 
+            qp.AddLinearConstraint(statePacket['right_leg'], 0, np.inf)
+            """Eq 9, Pg 8 from https://groups.csail.mit.edu/robotics-center/public_papers/Posa13.pdf"""
+            qp.AddLinearConstraint(lambda_c[0:2], 0, np.inf) #contact  and y
+            qp.AddLinearConstraint(lambda_c[2], 0, np.inf) # contact z
+            qp.AddLinearConstraint(lambda_c[3:5], 0, np.inf)
+            qp.AddLinearConstraint(lambda_c[5], 0, np.inf)
+            qp.AddLinearConstraint(gamma, 0, np.inf)
+            mu = 1
+            friction_force = lambda x: np.array([mu*x[2]-x[0]-x[1]])
+            """Eq 10, Pg 8 from https://groups.csail.mit.edu/robotics-center/public_papers/Posa13.pdf"""
+            qp.AddLinearConstraint(friction_force(lambda_c[:3]))
+            qp.AddLinearEqualityConstraint(lambda_c[1] == 0) #contact y
+            qp.AddLinearEqualityConstraint(lambda_c[4] == 0)
+            
+            qp.AddLinearConstraint()
             J_c, J_c_dot_v = calculateDoubleContactJacobians(self.plant, self.plant_context)
             #Dynamics
             qp.AddLinearEqualityConstraint(M@vdot + Cv + G - B@u - J_c.T@lambda_c, np.zeros((7,)))
@@ -272,8 +290,7 @@ class OSC(LeafSystem):
 
             # The constraint is applied to the 6x1 lambda_c vector
             qp.AddLinearConstraint(A_fric @ lambda_c.reshape(6, 1), -np.inf * np.ones((4, 1)), np.zeros((4, 1)))
-            qp.AddLinearEqualityConstraint(lambda_c[1] == 0)
-            qp.AddLinearEqualityConstraint(lambda_c[4] == 0)
+            
         else:
             qp.AddLinearEqualityConstraint(M@vdot + Cv + G - B@u, np.zeros((7,)))
 
