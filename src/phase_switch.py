@@ -38,14 +38,15 @@ class PhaseSwitch(LeafSystem):
         statePacket = fetchStates(self.plant_context, self.plant)
         t  = context.get_time()
         phase = 0
-        if t<=0.9*self.jump_time: # and self.phase is None:
+        if t<=self.jump_time: # and self.phase is None:
             phase = 1
             self.phase = phase
 
-        if (t>0.9*self.jump_time or statePacket['com_vel'][-1] > 0.9*required_vel) and statePacket['left_leg'][-1] > 0 and statePacket['right_leg'][-1] > 0:
+        elif t<1.2 and ((t>0.9*self.jump_time or statePacket['com_vel'][-1] > 0.9*required_vel) and statePacket['left_leg'][-1] > 0 and statePacket['right_leg'][-1] > 0):
             phase = 2
             self.phase = phase
-        if  (statePacket['left_leg'][-1] < 1e-2 or statePacket["right_leg"][-1] < 1e-2) and t>1.1*self.jump_time and statePacket['com_vel'][-1] < 0:
+        # if  (statePacket['left_leg'][-1] < 1e-2 or statePacket["right_leg"][-1] < 1e-2)  t>1.1*self.jump_time and statePacket['com_vel'][-1] < 0:
+        else:
             phase = 3
             self.phase = phase
         return self.phase
@@ -63,8 +64,8 @@ class PhaseSwitch(LeafSystem):
             leftleg = statePacket['left_leg']
             rightleg = statePacket['right_leg']
 
-            XOffset = 0.2
-            ZOffset = 0.97*0.85
+            XOffset = 0.5
+            ZOffset = 0.97*0.75
             if leftleg[0] > rightleg[0]:
                 output.set_value(BasicVector([com[0]+XOffset  , 0 , np.clip(com[-1]-ZOffset,0, np.inf), com[0]-XOffset, 0 , np.clip(com[-1]-ZOffset,0, np.inf)]))
             else:
