@@ -206,7 +206,7 @@ class OSC(LeafSystem):
     def solveQP(self, context):
         ## Get the context from the diagram ##
         x = self.EvalVectorInput(context, self.robot_state_input_port_index).get_value()
-        x = self.generateNoiseForStates(x)
+        # x = self.generateNoiseForStates(x)
         t = context.get_time()
 
         ## Update the internal context ##
