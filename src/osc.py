@@ -198,15 +198,15 @@ class OSC(LeafSystem):
         output.SetFromVector(outVector)        
 
     def generateNoiseForStates(self, x):
-        RAD2DEG = np.pi/180
+        RAD2DEG = (np.pi/180)/10
         std = np.array([  (.01)/3, (0.01)/3, RAD2DEG*5/3, RAD2DEG*5/3, RAD2DEG*5/3, RAD2DEG*5/3, RAD2DEG*5/3,
-                  (.1)/3, (0.1)/3, RAD2DEG*50/3, RAD2DEG*50/3, RAD2DEG*50/3, RAD2DEG*50/3  ,RAD2DEG*50/3])
+                  (.1)/3, (0.1)/3, RAD2DEG*50/3, RAD2DEG*50/3, RAD2DEG*50/3, RAD2DEG*50/3  ,RAD2DEG*50/3])*7
         return np.random.normal(x, std)
 
     def solveQP(self, context):
         ## Get the context from the diagram ##
         x = self.EvalVectorInput(context, self.robot_state_input_port_index).get_value()
-        # x = self.generateNoiseForStates(x)
+        x = self.generateNoiseForStates(x)
         t = context.get_time()
 
         ## Update the internal context ##
@@ -286,8 +286,8 @@ class OSC(LeafSystem):
             qp.AddLinearEqualityConstraint(lambda_c[1] == 0)
             qp.AddLinearEqualityConstraint(lambda_c[4] == 0)
             # Adding Additional Robustness constraint
-            qp.AddLinearConstraint(lambda_c[2], 1e2, 1e4)
-            qp.AddLinearConstraint(lambda_c[5], 1e2, 1e4)
+            qp.AddLinearConstraint(lambda_c[2], 1e2, 1e6)
+            qp.AddLinearConstraint(lambda_c[5], 1e2, 1e6)
         else:
             qp.AddLinearEqualityConstraint(M@vdot + Cv + G - B@u, np.zeros((7,)))
 
