@@ -78,7 +78,7 @@ def dir_col(N, initial_state, jumpheight, tf, jumpheight_tol=5e-2):
   
   for i in range(N-1):
        prog.AddQuadraticCost(0.5*(u[i] - u[i+1]).T @ (u[i] - u[i+1]).T)
-       prog.AddLinearConstraint(x[i][1], 0.6, 1.25)
+       prog.AddLinearConstraint(x[i][1], 0.6, 1.2)
        prog.AddLinearConstraint(x[i][0], -1e-2, 1e-2)
        prog.AddLinearConstraint(x[i][2], -1e-4, 1e-4)
        
@@ -116,8 +116,8 @@ def dir_col(N, initial_state, jumpheight, tf, jumpheight_tol=5e-2):
 
   lambda_init = np.ones((N, 8))
   lambda_c_col_init = np.ones((N-1, 8))
-  # prog.SetInitialGuess(x, np.load('/home/dhruv/Hop-Skip-and-Jump/src/logs/first_nice_run/x_sol.npy'))
-  # prog.SetInitialGuess(u, np.load('/home/dhruv/Hop-Skip-and-Jump/src/logs/first_nice_run/u_sol.npy'))
+  prog.SetInitialGuess(x, np.load('/home/dhruv/logs/exp3/zeropt1/x_sol.npy'))
+  prog.SetInitialGuess(u, np.load('/home/dhruv/logs/exp3/zeropt1/u_sol.npy'))
   prog.SetInitialGuess(lambda_c, lambda_init)
   prog.SetInitialGuess(lambda_c_col, lambda_c_col_init)
   

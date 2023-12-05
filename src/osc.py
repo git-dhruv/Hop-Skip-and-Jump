@@ -50,7 +50,7 @@ class OSC(LeafSystem):
         ## ___________Parameters for tracking___________ ##
         self.whatToTrack = [['COM', 'torso'],['foot'],['COM', 'torso']]
         
-        COMParams = {'Kp': np.diag([60, 0, 60]), 'Kd': 1*np.diag([100, 0, 100])/25 , 'saturations': 50} #Max Lim: 1 G
+        COMParams = {'Kp': np.diag([60, 0, 60]), 'Kd': 0*np.diag([100, 0, 100])/25 , 'saturations': 50} #Max Lim: 1 G
         COMParams_land = {'Kp': np.diag([600, 0, 600])/2, 'Kd': np.diag([100, 0, 100]) , 'saturations': 50} #Max Lim: 1 G
         TorsoParams = {'Kp': np.diag([0]), 'Kd': np.diag([2]) , 'saturations': 50} #Max Lim: 5 deg/s2
         TorsoParams_land = {'Kp': np.diag([5.85]), 'Kd': np.diag([2.85*1.75]) , 'saturations': 50} #Max Lim: 5 deg/s2
