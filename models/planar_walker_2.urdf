@@ -6,7 +6,7 @@
   <link name="base_xz"/>
   <link name="torso_mass">
     <inertial>
-      <mass value="55"/>
+      <mass value="51"/>
       <inertia ixx="4" ixy="0" ixz="0" iyy="4" iyz="0" izz="4"/>
     </inertial>
     <visual>
@@ -52,7 +52,7 @@
     </visual>
     <inertial>
       <origin xyz="0 0 -0.25"/>
-      <mass value="1.0"/>
+      <mass value="1.5"/>
       <inertia ixx="0" ixy="0" ixz="0" iyy="0" iyz="0" izz="0"/>
     </inertial>
   </link>
@@ -89,7 +89,7 @@
     </visual>
     <inertial>
       <origin xyz="0 0 -0.25"/>
-      <mass value="0.6"/>
+      <mass value="0.5"/>
       <inertia ixx="0" ixy="0" ixz="0" iyy="0" iyz="0" izz="0"/>
     </inertial>
   </link>
@@ -120,7 +120,7 @@
     </visual>
     <inertial>
       <origin xyz="0 0 -0.25"/>
-      <mass value="1.7"/>
+      <mass value="1.5"/>
       <inertia ixx="0" ixy="0" ixz="0" iyy="0" iyz="0" izz="0"/>
     </inertial>
   </link>
@@ -157,7 +157,7 @@
     </visual>
     <inertial>
       <origin xyz="0 0 -0.25"/>
-      <mass value="0.3"/>
+      <mass value="0.5"/>
       <inertia ixx="0" ixy="0" ixz="0" iyy="0" iyz="0" izz="0"/>
     </inertial>
   </link>
