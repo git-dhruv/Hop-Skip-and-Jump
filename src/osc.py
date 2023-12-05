@@ -20,7 +20,7 @@ from pydrake.solvers import MathematicalProgram, OsqpSolver
 from pydrake.common.value import AbstractValue
 from pydrake.math import RigidTransform
 from utils import calculateDoubleContactJacobians, fetchStates
-
+from pydrake.all import ContactResults
 ### FSM MODES ###
 PREFLIGHT = 0
 FLIGHT = 1
@@ -197,11 +197,16 @@ class OSC(LeafSystem):
         self.log_idx = idx
         output.SetFromVector(outVector)        
 
-        
+    def generateNoiseForStates(self, x):
+        RAD2DEG = np.pi/180
+        std = np.array([  (.01)/3, (0.01)/3, RAD2DEG*5/3, RAD2DEG*5/3, RAD2DEG*5/3, RAD2DEG*5/3, RAD2DEG*5/3,
+                  (.1)/3, (0.1)/3, RAD2DEG*50/3, RAD2DEG*50/3, RAD2DEG*50/3, RAD2DEG*50/3  ,RAD2DEG*50/3])
+        return np.random.normal(x, std)
 
     def solveQP(self, context):
         ## Get the context from the diagram ##
         x = self.EvalVectorInput(context, self.robot_state_input_port_index).get_value()
+        x = self.generateNoiseForStates(x)
         t = context.get_time()
 
         ## Update the internal context ##
@@ -214,7 +219,7 @@ class OSC(LeafSystem):
         qp = MathematicalProgram()
         u = qp.NewContinuousVariables(self.plant.num_actuators(), "u")
         vdot = qp.NewContinuousVariables(self.plant.num_velocities(), "vdot")
-        lambda_c = qp.NewContinuousVariables(6, "lambda_c")
+        lambda_c = qp.NewContinuousVariables(6, "lambda_c") #l[2] [-1] > 0
 
         ## Quadratic Costs ##
         whatToTrack = self.whatToTrack[self.fsm]
@@ -231,7 +236,7 @@ class OSC(LeafSystem):
             
             ## In Air Phase has foot trajectory to track
             if self.fsm==FLIGHT:
-                qp.AddQuadraticCost( 1e-3*u.T@u )
+                # qp.AddQuadraticCost( 1e-5*u.T@u )
                 if 'foot' in track:
                     for footNum in [0, 1]:
                         # Get what to track and system states
@@ -280,6 +285,9 @@ class OSC(LeafSystem):
             qp.AddLinearConstraint(A_fric @ lambda_c.reshape(6, 1), -np.inf * np.ones((4, 1)), np.zeros((4, 1)))
             qp.AddLinearEqualityConstraint(lambda_c[1] == 0)
             qp.AddLinearEqualityConstraint(lambda_c[4] == 0)
+            # Adding Additional Robustness constraint
+            qp.AddLinearConstraint(lambda_c[2], 1e2, 1e4)
+            qp.AddLinearConstraint(lambda_c[5], 1e2, 1e4)
         else:
             qp.AddLinearEqualityConstraint(M@vdot + Cv + G - B@u, np.zeros((7,)))
 
@@ -332,3 +340,5 @@ class OSC(LeafSystem):
 
     def get_phase_port_index(self):
         return self.get_input_port(self.phaseInput)
+
+

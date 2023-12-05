@@ -93,6 +93,7 @@ builder.Connect(PhaseSwitcher.get_phase_switch_output_port_index(),OScontroller.
 builder.Connect(OScontroller.torque_output_port, plant.get_actuation_input_port())
 builder.Connect(plant.get_state_output_port(), OScontroller.get_state_input_port()) 
 builder.Connect(plant.get_state_output_port(), PhaseSwitcher.get_state_input_port()) 
+# builder.Connect(plant.get_contact_results_output_port(), OScontroller.get_contact_input_port()) 
 
 # GIF Generators
 T_VW = np.array([[1., 0., 0., 0.],

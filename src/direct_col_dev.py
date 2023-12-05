@@ -41,15 +41,17 @@ def dir_col(N, initial_state, jumpheight, tf, jumpheight_tol=5e-2):
   n_u = robot.num_actuators()
   
   # Store the actuator limits here
-  effort_limits = np.array([robot.get_joint_actuator(JointActuatorIndex(act_idx)).effort_limit() for act_idx in range(n_u)])
+  effort_limits = 1000*np.array([robot.get_joint_actuator(JointActuatorIndex(act_idx)).effort_limit() for act_idx in range(n_u)])/1400
   """Joint limits specified in the order [planar_x: m, planar_z:m, roty(torso_angle): radians, left_hip:radians, right_hip: radians, left_knee: radians, right_knee: radians]"""
-  joint_limit_lower = np.array([-1e-1, 0, -1e-1, -3.14, 0, -3.14, 0])
-  joint_limit_upper = np.array([1e-1, 1, 1e-1, 3.14, 3.14, 3.14, 3.14])
+  joint_limit_lower = np.array([-1e-1, 0.6, -1e-1, -3.14, 0, -3.14, 0])
+  joint_limit_upper = np.array([1e-1, 1.25, 1e-1, 3.14, 3.14, 3.14, 3.14])
   
   # Create the mathematical program and decision variables
   prog = MathematicalProgram()
   x = np.array([prog.NewContinuousVariables(n_x, f"x_{i}") for i in  range(N)])
   u = np.array([prog.NewContinuousVariables(n_u, f"u_{i}") for i in  range(N)])
+  # 2,3,4,5,6
+  #lx, lx, ly, lz, lx, lx
   lambda_c_col = np.array([prog.NewContinuousVariables(8, f"lambda_c_col{i}") for i in  range(N-1)])
   lambda_c = np.array([prog.NewContinuousVariables(8, f"lambda_c_{i}") for i in range(N)])
   gamma = np.array([prog.NewContinuousVariables(6, f"gamma_{i}") for i in range(N)])
@@ -76,14 +78,14 @@ def dir_col(N, initial_state, jumpheight, tf, jumpheight_tol=5e-2):
   
   for i in range(N-1):
        prog.AddQuadraticCost(0.5*(u[i] - u[i+1]).T @ (u[i] - u[i+1]).T)
-       prog.AddLinearConstraint(x[i][1], 0.6, 1.2)
+       prog.AddLinearConstraint(x[i][1], 0.6, 1.25)
        prog.AddLinearConstraint(x[i][0], -1e-2, 1e-2)
        prog.AddLinearConstraint(x[i][2], -1e-4, 1e-4)
        
        if i>=N-3:
         prog.AddLinearConstraint(x[i+1][n_q+1] - x[i][n_q+1] , -9, 30)
         # Adding costs for angular momentum
-        AddAngularMomentumConstraint(prog, robot, context, x[i], 1)
+        # AddAngularMomentumConstraint(prog, robot, context, x[i], 1)
        else:
         prog.AddLinearConstraint(x[i+1][n_q+1] - x[i][n_q+1], -20, 9)
         prog.AddLinearConstraint(x[i][n_q] - x[i+1][n_q], -.01, .01)        
@@ -102,29 +104,32 @@ def dir_col(N, initial_state, jumpheight, tf, jumpheight_tol=5e-2):
       # The constraint is applied to the 6x1 lambda_c vector
       prog.AddLinearConstraint(mu*lambda_c[i][3]-lambda_c[i][0]-lambda_c[i][1], 0, np.inf)
       prog.AddLinearConstraint(mu*lambda_c[i][7]-lambda_c[i][4]-lambda_c[i][5], 0, np.inf)
+      prog.AddLinearEqualityConstraint(lambda_c[i][2] == 0)
+      prog.AddLinearEqualityConstraint(lambda_c[i][6] == 0)
       prog.AddBoundingBoxConstraint(np.zeros(8), np.ones(8)*np.inf, lambda_c[i])
       prog.AddBoundingBoxConstraint(np.zeros(6), np.ones(6)*np.inf, gamma[i])
-      prog.AddLinearEqualityConstraint(lambda_c[i][2] == 0)
-      prog.AddLinearEqualityConstraint(lambda_c[i][5] == 0)
   for i in range(N-1):
-      prog.AddBoundingBoxConstraint(np.zeros(8), np.ones(8)*np.inf, lambda_c_col[i])
-      prog.AddBoundingBoxConstraint(np.zeros(6), np.ones(6)*np.inf, gamma_col[i])
       prog.AddLinearEqualityConstraint(lambda_c_col[i][2] == 0)
-      prog.AddLinearEqualityConstraint(lambda_c_col[i][5] == 0)
+      prog.AddLinearEqualityConstraint(lambda_c_col[i][6] == 0)
+      prog.AddBoundingBoxConstraint(np.zeros(8), np.ones(8)*np.inf, lambda_c_col[i])      
+      prog.AddBoundingBoxConstraint(np.zeros(6), np.ones(6)*np.inf, gamma_col[i])
 
-  lambda_init = np.zeros((N, 8))
-  lambda_c_col_init = np.zeros((N-1, 8))
-  # prog.SetInitialGuess(x, np.load('/home/anirudhkailaje/Documents/01_UPenn/02_MEAM5170/03_FinalProject/x.npy'))
-  # prog.SetInitialGuess(u, np.load('/home/anirudhkailaje/Documents/01_UPenn/02_MEAM5170/03_FinalProject/u.npy'))
+  lambda_init = np.ones((N, 8))
+  lambda_c_col_init = np.ones((N-1, 8))
+  # prog.SetInitialGuess(x, np.load('/home/dhruv/Hop-Skip-and-Jump/src/logs/first_nice_run/x_sol.npy'))
+  # prog.SetInitialGuess(u, np.load('/home/dhruv/Hop-Skip-and-Jump/src/logs/first_nice_run/u_sol.npy'))
   prog.SetInitialGuess(lambda_c, lambda_init)
   prog.SetInitialGuess(lambda_c_col, lambda_c_col_init)
   
 
   logger.debug("Starting the solve")
   
-  prog.SetSolverOption(SolverType.kSnopt, "Major iterations limit", 30000) #30000
-  prog.SetSolverOption(SolverType.kSnopt, "Minor feasibility tolerance", 5e-3)
-  # prog.SetSolverOption(SolverType.kSnopt, "Major optimality tolerance", 1e-4)
+  prog.SetSolverOption(SolverType.kSnopt, "Major iterations limit", 3e10) #30000
+  prog.SetSolverOption(SolverType.kSnopt, "Minor feasibility tolerance", 1e-5)
+  prog.SetSolverOption(SolverType.kSnopt, "Major optimality tolerance", 1e-3)
+  # prog.SetSolverOption(SolverType.kSnopt, "Major iterations limit", 3e10) #30000
+  # prog.SetSolverOption(SolverType.kSnopt, "Minor feasibility tolerance", 1e-10)
+  # prog.SetSolverOption(SolverType.kSnopt, "Major optimality tolerance", 1e-3)
   
   result = Solve(prog)
   

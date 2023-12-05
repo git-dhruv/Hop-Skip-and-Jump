@@ -3,7 +3,7 @@ import matplotlib.pyplot as plt
 import pickle
 from os.path import join as opj
 
-folder_location = r"/home/anirudhkailaje/Documents/01_UPenn/02_MEAM5170/03_FinalProject/src/logs/2023-12-02_17-18-44"
+folder_location = r"/home/dhruv/Hop-Skip-and-Jump/src/logs/2023-12-02_17-49-49"
 with open(opj(folder_location, "data.pickle"), "rb") as file:
     COM_POS, COM_VEL, T_POS, T_VEL, left, right, COM_POS_DESIRED, COM_VEL_DESIRED, Torso_POS_DESIRED, Torso_VEL_DESIRED, LFt_POS_DESIRED, RFt_POS_DESIRED, FSM, Torque, Costs, t, LContact, RContact = pickle.load(file)
 FSM = np.int32(FSM)
@@ -12,7 +12,7 @@ print(FSM.shape)
 fig, axs = plt.subplots(2, 1, figsize=(7, 10))
 axs[0].imshow(np.row_stack((RContact,LContact))[:,1000:1500]  )
 axs[1].plot(FSM[0,1000:1500]  )
-plt.show()
+plt.show(block=False)
 
 
 
