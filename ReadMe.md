@@ -1,9 +1,5 @@
 # Optimization based Biped Jump with uncertainties  
-## Authors: Dhruv Parikh, Anirudh Kailaje
-|                          |                          |                          |                          
-| ------------------------------- | ------------------------------- | ------------------------------- | 
-| ![Image 2](static/final/image19.gif) | ![Image 3](static/final/image20.gif) | ![Image 4](static/final/image21.gif) |
-
+![Poster](static/Picture1.jpg)
 We present a 3-phase hybrid controller that jumps to a required height. The launch trajectory is obtained through contact implicit Direct Collocation, a mathematical program with complimentary constraints (MPCC). The trajectory is followed by an Operational Space Controller (OSC). Separate OSCs were made for the flight and landing phases. The controller we made is robust against a wide range of system mass fluctuations, state estimation errors, and terrain geometry. The controller works for a range of jump height requirements for a given system mass distribution, estimation error, and terrain. It is sensitive to low coefficient of friction, solver parameters, and phase switch error when direct collocation fails.
 
 ## Results
@@ -38,7 +34,11 @@ During experimentation, we observed challenges that warrant careful examination 
 3. **Optimal Control with Slip**
     - Introduce complementary constraints in Optimal Control with Slip (OSC) to facilitate slip in the system.
 
-These observations provide valuable insights for further investigation and improvement of the controller.
+These observations provide valuable insights for further investigation and improvement of the controller. The final results are shown here
+|                          |                          |                          |                          
+| ------------------------------- | ------------------------------- | ------------------------------- | 
+| ![Image 2](static/final/image19.gif) | ![Image 3](static/final/image20.gif) | ![Image 4](static/final/image21.gif) |
+
 
 
 ## Setup
@@ -50,6 +50,10 @@ python -m venv venv
 venv\Scripts\activate
 pip install -r requirements.txt
 ```
+
+## Authors
+- Anirudh Kailaje (@KailajeAnirudh)
+- Dhruv Parikh (@git-dhruv)
 
 ## License
 Copyright <2023>
