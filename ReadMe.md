@@ -1,7 +1,7 @@
 # Optimization based Biped Jump with uncertainties  
 ![Poster](static/Picture1.jpg)
 We present a 3-phase hybrid controller that jumps to a required height. The launch trajectory is obtained through contact implicit Direct Collocation, a mathematical program with complimentary constraints (MPCC). The trajectory is followed by an Operational Space Controller (OSC). Separate OSCs were made for the flight and landing phases. The controller we made is robust against a wide range of system mass fluctuations, state estimation errors, and terrain geometry. The controller works for a range of jump height requirements for a given system mass distribution, estimation error, and terrain. It is sensitive to low coefficient of friction, solver parameters, and phase switch error when direct collocation fails.
-
+Please find the complete report [here](report/HopSkipandJumpReport.pdf)
 ## Results
 
 |                          |                          |                          |                          |
